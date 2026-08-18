@@ -1,6 +1,5 @@
-'use client';
-
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { formatWIB } from '@/lib/utils/time';
 import { formatRupiah } from '@/lib/utils/format';
 import { verifyVisitAction } from './actions';
@@ -35,6 +34,51 @@ export default function DashboardView({
   initialVisits,
   marketings,
 }: DashboardViewProps) {
+  // Realtime Live Visits State
+  const [visitsList, setVisitsList] = useState<DashboardVisit[]>(initialVisits);
+
+  useEffect(() => {
+    setVisitsList(initialVisits);
+  }, [initialVisits]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel('dasbor_realtime_visits')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'visits' },
+        async (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const { data: newV } = await supabase
+              .from('visits')
+              .select('*, marketing:profiles(full_name, marketing_code), visit_photos(*)')
+              .eq('id', (payload.new as Visit).id)
+              .maybeSingle();
+
+            if (newV) {
+              setVisitsList((prev) => [
+                newV as unknown as DashboardVisit,
+                ...prev.filter((v) => v.id !== (newV as Visit).id),
+              ]);
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as Visit;
+            setVisitsList((prev) =>
+              prev.map((v) => (v.id === updated.id ? { ...v, ...updated } : v))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id: string }).id;
+            setVisitsList((prev) => prev.filter((v) => v.id !== deletedId));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
   // State Filter
   const [dateShortcut, setDateShortcut] = useState<DateShortcut>('bulan_ini');
   const [selectedMarketing, setSelectedMarketing] = useState<string>('semua');
@@ -73,7 +117,7 @@ export default function DashboardView({
       endFilter = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     }
 
-    return initialVisits.filter((v) => {
+    return visitsList.filter((v) => {
       const vDate = new Date(v.captured_at);
 
       if (startFilter && vDate < startFilter) return false;
@@ -98,7 +142,7 @@ export default function DashboardView({
       return true;
     });
   }, [
-    initialVisits,
+    visitsList,
     dateShortcut,
     selectedMarketing,
     selectedVisitType,

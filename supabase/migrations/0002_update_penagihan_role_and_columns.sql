@@ -1,5 +1,5 @@
 -- ====================================================================
--- MIGRATION 0002: Pembaruan Role Penagihan & Kolom Baki Debet / Kolektibilitas
+-- MIGRATION 0002: Pembaruan Role Penagihan, Kolom Baki Debet, & Realtime Live
 -- Salin dan jalankan seluruh isi berkas ini di SQL Editor Supabase Anda
 -- ====================================================================
 
@@ -78,5 +78,23 @@ CREATE POLICY "visit_photos_insert" ON public.visit_photos
         )
     );
 
--- 4. Reload PostgREST schema cache agar Supabase mengenali kolom baru seketika
+-- 4. Aktifkan Realtime Publikasi Supabase untuk tabel visits & profiles
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'visits'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.visits;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'profiles'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+    END IF;
+END $$;
+
+-- 5. Reload PostgREST schema cache agar Supabase mengenali kolom baru seketika
 NOTIFY pgrst, 'reload schema';

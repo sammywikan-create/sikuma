@@ -25,11 +25,11 @@ export default async function DasborPage() {
     redirect('/kunjungan');
   }
 
-  // 1. Ambil seluruh profil marketing aktif
+  // 1. Ambil seluruh profil marketing & penagihan aktif
   const { data: marketingProfilesRaw } = await supabase
     .from('profiles')
     .select('*')
-    .eq('role', 'marketing')
+    .in('role', ['marketing', 'penagihan'])
     .order('marketing_code', { ascending: true });
 
   const marketings = (marketingProfilesRaw as unknown as Profile[]) || [];
