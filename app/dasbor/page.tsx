@@ -1,8 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { redirect } from 'next/navigation';
 import DasborNav from '@/components/dasbor/dasbor-nav';
 import DashboardView, { type DashboardVisit } from './dashboard-view';
 import type { Profile } from '@/lib/types/database';
+
+// Jangan cache halaman ini — selalu ambil data terbaru
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function DasborPage() {
   const supabase = await createClient();
@@ -25,8 +30,15 @@ export default async function DasborPage() {
     redirect('/kunjungan');
   }
 
+  // Gunakan service_role untuk bypass RLS — kacab wajib melihat semua data
+  const adminClient = createSupabaseAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+
   // 1. Ambil seluruh profil marketing & penagihan aktif
-  const { data: marketingProfilesRaw } = await supabase
+  const { data: marketingProfilesRaw } = await adminClient
     .from('profiles')
     .select('*')
     .in('role', ['marketing', 'penagihan'])
@@ -34,8 +46,8 @@ export default async function DasborPage() {
 
   const marketings = (marketingProfilesRaw as unknown as Profile[]) || [];
 
-  // 2. Ambil seluruh data kunjungan beserta foto & profil marketing
-  const { data: visitsRaw } = await supabase
+  // 2. Ambil seluruh data kunjungan beserta foto & profil marketing (bypass RLS)
+  const { data: visitsRaw } = await adminClient
     .from('visits')
     .select(`
       *,
@@ -56,9 +68,15 @@ export default async function DasborPage() {
       {/* Top Header Profil */}
       <header className="flex items-center justify-between pb-3.5 border-b border-slate-200 mb-3">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-            {profile.role === 'kacab' ? 'Kepala Cabang' : 'Administrator'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              {profile.role === 'kacab' ? 'Kepala Cabang' : 'Administrator'}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live Realtime
+            </span>
+          </div>
           <h1 className="text-lg font-bold text-slate-900 mt-1">
             {profile.full_name}
           </h1>

@@ -47,6 +47,8 @@ export async function loginAction(prevState: FormState, formData: FormData): Pro
   // Pengalihan berdasarkan peran
   if (profile.role === 'marketing') {
     redirect('/kunjungan');
+  } else if (profile.role === 'penagihan') {
+    redirect('/penagihan');
   } else {
     redirect('/dasbor');
   }

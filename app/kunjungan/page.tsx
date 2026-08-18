@@ -3,6 +3,10 @@ import { redirect } from 'next/navigation';
 import KunjunganView, { type VisitWithPhotos } from './kunjungan-view';
 import type { Profile } from '@/lib/types/database';
 
+// Jangan cache — selalu ambil data terbaru saat navigasi
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function KunjunganPage() {
   const supabase = await createClient();
 

@@ -84,9 +84,9 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()) as { data: Profile | null };
 
-    if (!profile || !profile.is_active || profile.role !== 'marketing') {
+    if (!profile || !profile.is_active || (profile.role !== 'marketing' && profile.role !== 'penagihan')) {
       return NextResponse.json(
-        { error: 'Hanya marketing aktif yang dapat mencatat kunjungan.' },
+        { error: 'Hanya marketing atau petugas penagihan aktif yang dapat mencatat kunjungan.' },
         { status: 403 }
       );
     }

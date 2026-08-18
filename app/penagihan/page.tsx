@@ -3,6 +3,10 @@ import { redirect } from 'next/navigation';
 import PenagihanView, { type VisitWithPhotos } from './penagihan-view';
 import type { Profile } from '@/lib/types/database';
 
+// Jangan cache — selalu ambil data terbaru saat navigasi
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function PenagihanPage() {
   const supabase = await createClient();
 

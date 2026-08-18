@@ -1,9 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { redirect } from 'next/navigation';
 import DasborNav from '@/components/dasbor/dasbor-nav';
 import AnomaliView from './anomali-view';
 import type { Profile } from '@/lib/types/database';
 import type { DashboardVisit } from '../dashboard-view';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AnomaliPage() {
   const supabase = await createClient();
@@ -26,8 +30,15 @@ export default async function AnomaliPage() {
     redirect('/kunjungan');
   }
 
+  // Gunakan service_role untuk bypass RLS
+  const adminClient = createSupabaseAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+
   // Ambil kunjungan yang berflag anomali
-  const { data: visitsRaw } = await supabase
+  const { data: visitsRaw } = await adminClient
     .from('visits')
     .select(`
       *,
