@@ -42,7 +42,7 @@ export default async function AnomaliPage() {
     .from('visits')
     .select(`
       *,
-      marketing:profiles (full_name, marketing_code),
+      marketing:profiles!marketing_id (full_name, marketing_code),
       visit_photos (*)
     `)
     .not('anomaly_flags', 'eq', '{}')

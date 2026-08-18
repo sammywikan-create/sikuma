@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       .from('visits')
       .select(`
         *,
-        marketing:profiles (full_name, marketing_code),
+        marketing:profiles!marketing_id (full_name, marketing_code),
         visit_photos (*)
       `)
       .gte('captured_at', startDate.toISOString())

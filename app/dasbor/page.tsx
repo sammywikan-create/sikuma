@@ -51,7 +51,7 @@ export default async function DasborPage() {
     .from('visits')
     .select(`
       *,
-      marketing:profiles (full_name, marketing_code),
+      marketing:profiles!marketing_id (full_name, marketing_code),
       visit_photos (*)
     `)
     .order('captured_at', { ascending: false });

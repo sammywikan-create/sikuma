@@ -54,7 +54,7 @@ export default function DashboardView({
           if (payload.eventType === 'INSERT') {
             const { data: newV } = await supabase
               .from('visits')
-              .select('*, marketing:profiles(full_name, marketing_code), visit_photos(*)')
+              .select('*, marketing:profiles!marketing_id(full_name, marketing_code), visit_photos(*)')
               .eq('id', (payload.new as Visit).id)
               .maybeSingle();
 
