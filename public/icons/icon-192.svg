@@ -1,0 +1,12 @@
+
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="42.24" fill="#092C4C"/>
+  <rect x="15.36" y="15.36" width="161.28" height="161.28" rx="30.72" fill="#0c3860" stroke="#0ea5e9" stroke-width="3.84"/>
+  <!-- Bank Building / Shield Icon -->
+  <path d="M 96 42.24 L 48 72.96000000000001 L 144 72.96000000000001 Z" fill="#38bdf8"/>
+  <rect x="53.760000000000005" y="80.64" width="15.36" height="46.08" rx="3.84" fill="#ffffff"/>
+  <rect x="88.32000000000001" y="80.64" width="15.36" height="46.08" rx="3.84" fill="#ffffff"/>
+  <rect x="122.88" y="80.64" width="15.36" height="46.08" rx="3.84" fill="#ffffff"/>
+  <rect x="42.24" y="130.56" width="107.52000000000001" height="11.52" rx="3.84" fill="#38bdf8"/>
+  <text x="96" y="165.12" font-family="Arial, sans-serif" font-weight="900" font-size="21.12" fill="#ffffff" text-anchor="middle" letter-spacing="1.92">SIKUMA</text>
+</svg>

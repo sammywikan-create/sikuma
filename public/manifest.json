@@ -1,0 +1,24 @@
+{
+  "name": "SIKUMA Bank BKK",
+  "short_name": "SIKUMA",
+  "description": "Sistem Informasi Kunjungan Marketing PT BPR BKK",
+  "start_url": "/masuk",
+  "display": "standalone",
+  "background_color": "#092C4C",
+  "theme_color": "#092C4C",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
