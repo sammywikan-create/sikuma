@@ -468,7 +468,9 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || 'Gagal menyimpan data kunjungan ke server.');
+          // Server merespons dengan galat (misal validasi / skema)
+          setSubmitError(data.error || `Server menolak pengiriman (${res.status}).`);
+          return;
         }
 
         await clearCurrentDraft();
@@ -485,8 +487,8 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
           isOfflineQueued: false,
         });
       } catch (networkErr: unknown) {
-        // Fallback jika jaringan tiba-tiba gagal saat fetch
-        console.warn('Gagal kirim online, menyimpan ke antrean offline:', networkErr);
+        // Fallback hanya jika perangkat benar-benar kehilangan sinyal / fetch error
+        console.warn('Koneksi terputus saat kirim, menyimpan ke antrean offline:', networkErr);
 
         await enqueueVisit({
           client_uuid: clientUuid,
@@ -495,6 +497,8 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
           product,
           outcome,
           potential_value: potentialNum,
+          baki_debet: bakiDebetNum,
+          kolektibilitas: visitType === 'penagihan' ? kolektibilitas : null,
           notes: notes.trim() || null,
           captured_at: primaryPhoto.captured_at,
           lat: primaryPhoto.lat,
