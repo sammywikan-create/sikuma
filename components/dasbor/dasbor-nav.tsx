@@ -18,11 +18,9 @@ export default function DasborNav({ role, anomalyCount = 0 }: DasborNavProps) {
       label: `⚠️ Anomali ${anomalyCount > 0 ? `(${anomalyCount})` : ''}`,
       exact: false,
     },
+    { href: '/dasbor/pengguna', label: '👥 Kelola Pengguna', exact: false },
     ...(role === 'admin'
-      ? [
-          { href: '/dasbor/pengguna', label: '👥 Kelola Pengguna', exact: false },
-          { href: '/dasbor/retensi', label: '🗄️ Retensi Data', exact: false },
-        ]
+      ? [{ href: '/dasbor/retensi', label: '🗄️ Retensi Data', exact: false }]
       : []),
   ];
 

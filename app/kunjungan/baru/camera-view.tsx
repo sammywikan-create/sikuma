@@ -64,8 +64,12 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
 
   // State Formulir Kunjungan
   const [customerName, setCustomerName] = useState<string>('');
-  const [visitType, setVisitType] = useState<VisitType>('prospek_baru');
-  const [product, setProduct] = useState<ProductType>('tabungan');
+  const [visitType, setVisitType] = useState<VisitType>(
+    profile.role === 'penagihan' ? 'penagihan' : 'prospek_baru'
+  );
+  const [product, setProduct] = useState<ProductType>(
+    profile.role === 'penagihan' ? 'kredit' : 'tabungan'
+  );
   const [outcome, setOutcome] = useState<OutcomeType>('berminat');
   const [potentialValueRaw, setPotentialValueRaw] = useState<string>('');
   const [bakiDebetRaw, setBakiDebetRaw] = useState<string>('');
@@ -606,10 +610,10 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
               Catat Kunjungan Berikutnya 📷
             </button>
             <Link
-              href="/kunjungan"
+              href={profile.role === 'penagihan' ? '/penagihan' : '/kunjungan'}
               className="block w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs smooth-transition text-center"
             >
-              Kembali ke Beranda Kunjungan
+              Kembali ke Beranda {profile.role === 'penagihan' ? 'Penagihan' : 'Kunjungan'}
             </Link>
           </div>
         </div>
@@ -622,15 +626,17 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
       {/* 1. Header Bar */}
       <header className="p-3 bg-slate-900/90 backdrop-blur border-b border-slate-800 flex items-center justify-between z-10 sticky top-0">
         <Link
-          href="/kunjungan"
+          href={profile.role === 'penagihan' ? '/penagihan' : '/kunjungan'}
           className="text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-slate-800 active:bg-slate-700 smooth-transition"
         >
           ← Batal
         </Link>
         <div className="text-center">
-          <h1 className="text-sm font-bold tracking-tight">Kunjungan Baru</h1>
+          <h1 className="text-sm font-bold tracking-tight">
+            {profile.role === 'penagihan' ? 'Catat Penagihan' : 'Kunjungan Baru'}
+          </h1>
           <p className="text-[11px] text-slate-400">
-            {profile.marketing_code || 'MKT'} • {photos.length}/3 Foto
+            {profile.marketing_code || (profile.role === 'penagihan' ? 'AO' : 'MKT')} • {photos.length}/3 Foto
           </p>
         </div>
         <div className="w-16"></div>

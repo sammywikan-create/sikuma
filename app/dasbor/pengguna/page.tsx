@@ -21,7 +21,7 @@ export default async function PenggunaPage() {
     .eq('id', user.id)
     .maybeSingle()) as { data: Profile | null };
 
-  if (!profile || profile.role !== 'admin') {
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
     redirect('/dasbor');
   }
 
@@ -38,7 +38,7 @@ export default async function PenggunaPage() {
       <header className="flex items-center justify-between pb-3.5 border-b border-slate-200 mb-3">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
-            Administrator
+            {profile.role === 'kacab' ? 'Kepala Cabang' : 'Administrator'}
           </span>
           <h1 className="text-lg font-bold text-slate-900 mt-1">
             Kelola Pengguna Sistem

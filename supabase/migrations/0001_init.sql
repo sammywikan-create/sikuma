@@ -9,8 +9,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name TEXT NOT NULL,
-    marketing_code TEXT UNIQUE, -- contoh: MKT01 (hanya untuk role marketing)
-    role TEXT NOT NULL CHECK (role IN ('marketing', 'kacab', 'admin')),
+    marketing_code TEXT UNIQUE, -- contoh: MKT01 (marketing) atau AO01 (penagihan)
+    role TEXT NOT NULL CHECK (role IN ('marketing', 'penagihan', 'kacab', 'admin')),
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -173,42 +173,42 @@ DROP POLICY IF EXISTS "profiles_insert" ON public.profiles;
 CREATE POLICY "profiles_insert" ON public.profiles
     FOR INSERT
     WITH CHECK (
-        public.get_auth_role() = 'admin'
+        public.get_auth_role() IN ('kacab', 'admin')
     );
 
 DROP POLICY IF EXISTS "profiles_update" ON public.profiles;
 CREATE POLICY "profiles_update" ON public.profiles
     FOR UPDATE
     USING (
-        public.get_auth_role() = 'admin'
+        public.get_auth_role() IN ('kacab', 'admin')
     )
     WITH CHECK (
-        public.get_auth_role() = 'admin'
+        public.get_auth_role() IN ('kacab', 'admin')
     );
 
 DROP POLICY IF EXISTS "profiles_delete" ON public.profiles;
 CREATE POLICY "profiles_delete" ON public.profiles
     FOR DELETE
     USING (
-        public.get_auth_role() = 'admin'
+        public.get_auth_role() IN ('kacab', 'admin')
     );
 
 -- 9.2 RLS VISITS
--- Marketing hanya boleh SELECT datanya sendiri. Kacab dan admin boleh SELECT semua.
+-- Petugas (marketing/penagihan) hanya boleh SELECT datanya sendiri. Kacab dan admin boleh SELECT semua.
 DROP POLICY IF EXISTS "visits_select" ON public.visits;
 CREATE POLICY "visits_select" ON public.visits
     FOR SELECT
     USING (
-        (public.get_auth_role() = 'marketing' AND marketing_id = auth.uid())
+        (public.get_auth_role() IN ('marketing', 'penagihan') AND marketing_id = auth.uid())
         OR public.get_auth_role() IN ('kacab', 'admin')
     );
 
--- Marketing boleh INSERT hanya untuk dirinya sendiri.
+-- Petugas boleh INSERT hanya untuk dirinya sendiri.
 DROP POLICY IF EXISTS "visits_insert" ON public.visits;
 CREATE POLICY "visits_insert" ON public.visits
     FOR INSERT
     WITH CHECK (
-        public.get_auth_role() = 'marketing' AND marketing_id = auth.uid()
+        public.get_auth_role() IN ('marketing', 'penagihan') AND marketing_id = auth.uid()
     );
 
 -- Hanya Kacab dan Admin yang boleh UPDATE (kolom dibatasi oleh trigger).
@@ -229,7 +229,7 @@ CREATE POLICY "visits_delete" ON public.visits
     USING (false);
 
 -- 9.3 RLS VISIT_PHOTOS
--- Mengikuti hak akses visit induknya
+-- Hanya boleh dilihat jika visits induknya boleh dilihat.
 DROP POLICY IF EXISTS "visit_photos_select" ON public.visit_photos;
 CREATE POLICY "visit_photos_select" ON public.visit_photos
     FOR SELECT
@@ -237,6 +237,10 @@ CREATE POLICY "visit_photos_select" ON public.visit_photos
         EXISTS (
             SELECT 1 FROM public.visits v
             WHERE v.id = visit_photos.visit_id
+            AND (
+                (public.get_auth_role() IN ('marketing', 'penagihan') AND v.marketing_id = auth.uid())
+                OR public.get_auth_role() IN ('kacab', 'admin')
+            )
         )
     );
 
@@ -244,7 +248,7 @@ DROP POLICY IF EXISTS "visit_photos_insert" ON public.visit_photos;
 CREATE POLICY "visit_photos_insert" ON public.visit_photos
     FOR INSERT
     WITH CHECK (
-        EXISTS (
+        public.get_auth_role() IN ('marketing', 'penagihan') AND EXISTS (
             SELECT 1 FROM public.visits v
             WHERE v.id = visit_photos.visit_id
             AND v.marketing_id = auth.uid()

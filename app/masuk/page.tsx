@@ -27,7 +27,7 @@ export default function MasukPage() {
           Masuk ke Akun Anda
         </h2>
         <p className="text-xs text-slate-500 mb-6">
-          Masukkan email dan kata sandi yang telah didaftarkan oleh admin.
+          Masukkan email dan kata sandi yang telah didaftarkan oleh Kepala Cabang atau Admin.
         </p>
 
         {state?.error && (

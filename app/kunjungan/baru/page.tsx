@@ -20,7 +20,7 @@ export default async function KunjunganBaruPage() {
     .eq('id', user.id)
     .maybeSingle()) as { data: Profile | null };
 
-  if (!profile || profile.role !== 'marketing') {
+  if (!profile || (profile.role !== 'marketing' && profile.role !== 'penagihan')) {
     redirect('/dasbor');
   }
 

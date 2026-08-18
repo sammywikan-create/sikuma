@@ -1,4 +1,4 @@
-export type UserRole = 'marketing' | 'kacab' | 'admin';
+export type UserRole = 'marketing' | 'penagihan' | 'kacab' | 'admin';
 
 export type VisitType =
   | 'prospek_baru'

@@ -52,6 +52,7 @@ export default async function KunjunganPage() {
       visit_photos (*)
     `)
     .eq('marketing_id', user.id)
+    .neq('visit_type', 'penagihan')
     .gte('captured_at', thirtyDaysAgo.toISOString())
     .order('captured_at', { ascending: false });
 

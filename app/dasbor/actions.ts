@@ -102,8 +102,8 @@ export async function createMarketingUserAction(payload: {
     .eq('id', user.id)
     .single()) as { data: Pick<Profile, 'role'> | null };
 
-  if (!profile || profile.role !== 'admin') {
-    return { error: 'Hanya Admin yang dapat menambah pengguna baru.' };
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
+    return { error: 'Hanya Kepala Cabang atau Admin yang dapat menambah pengguna baru.' };
   }
 
   const adminClient = createSupabaseAdminClient(
@@ -149,6 +149,7 @@ export async function createMarketingUserAction(payload: {
       full_name: payload.full_name,
       marketing_code: payload.marketing_code,
       role: payload.role,
+      created_by_role: profile.role,
     },
   });
 
@@ -173,8 +174,8 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
     .eq('id', user.id)
     .single()) as { data: Pick<Profile, 'role'> | null };
 
-  if (!profile || profile.role !== 'admin') {
-    return { error: 'Hanya Admin yang dapat mengubah status akun.' };
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
+    return { error: 'Hanya Kepala Cabang atau Admin yang dapat mengubah status akun.' };
   }
 
   const adminClient = createSupabaseAdminClient(

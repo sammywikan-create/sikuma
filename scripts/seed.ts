@@ -25,7 +25,7 @@ interface SeedUser {
   email: string;
   password: string;
   fullName: string;
-  role: 'kacab' | 'admin' | 'marketing';
+  role: 'kacab' | 'admin' | 'marketing' | 'penagihan';
   marketingCode?: string;
 }
 
@@ -33,7 +33,7 @@ const SEED_USERS: SeedUser[] = [
   {
     email: 'kacab@bkk.co.id',
     password: 'Password123!',
-    fullName: 'Budi Santoso',
+    fullName: 'Budi Santoso, S.E.',
     role: 'kacab',
   },
   {
@@ -41,27 +41,6 @@ const SEED_USERS: SeedUser[] = [
     password: 'Password123!',
     fullName: 'Administrator Pusat',
     role: 'admin',
-  },
-  {
-    email: 'mkt01@bkk.co.id',
-    password: 'Password123!',
-    fullName: 'Ahmad Dahlan',
-    role: 'marketing',
-    marketingCode: 'MKT01',
-  },
-  {
-    email: 'mkt02@bkk.co.id',
-    password: 'Password123!',
-    fullName: 'Siti Rahayu',
-    role: 'marketing',
-    marketingCode: 'MKT02',
-  },
-  {
-    email: 'mkt03@bkk.co.id',
-    password: 'Password123!',
-    fullName: 'Eko Prasetyo',
-    role: 'marketing',
-    marketingCode: 'MKT03',
   },
 ];
 
@@ -90,6 +69,17 @@ async function seed() {
     }
   } catch (err) {
     console.warn('⚠️ Peringatan saat inisialisasi bucket:', err);
+  }
+
+  // 2. Bersihkan seluruh dummy data kunjungan lama
+  try {
+    console.log('🧹 Membersihkan dummy data kunjungan...');
+    await supabaseAdmin.from('visit_photos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('visits').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('audit_log').delete().neq('id', 0);
+    console.log('✅ Basis data kunjungan telah bersih.');
+  } catch (err) {
+    console.warn('ℹ️ Info saat pembersihan:', err);
   }
 
   // 2. Buat akun pengguna & profil

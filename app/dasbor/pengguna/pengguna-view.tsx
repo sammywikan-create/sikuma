@@ -114,10 +114,12 @@ export default function PenggunaView({ initialProfiles }: PenggunaViewProps) {
                       ? 'bg-purple-100 text-purple-700'
                       : p.role === 'kacab'
                       ? 'bg-emerald-100 text-emerald-700'
+                      : p.role === 'penagihan'
+                      ? 'bg-amber-100 text-amber-800'
                       : 'bg-bkk-100 text-bkk-700'
                   }`}
                 >
-                  {p.role}
+                  {p.role === 'penagihan' ? 'Penagihan (AO)' : p.role}
                 </span>
                 {p.marketing_code && (
                   <span className="font-mono text-xs font-bold text-slate-700">
@@ -199,7 +201,7 @@ export default function PenggunaView({ initialProfiles }: PenggunaViewProps) {
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="marketing@bkk.co.id"
+                  placeholder={newRole === 'penagihan' ? 'ao01@bkk.co.id' : 'marketing01@bkk.co.id'}
                   className="w-full min-h-[40px] px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-bkk-500 text-xs"
                 />
               </div>
@@ -214,7 +216,8 @@ export default function PenggunaView({ initialProfiles }: PenggunaViewProps) {
                     onChange={(e) => setNewRole(e.target.value as UserRole)}
                     className="w-full min-h-[40px] px-2.5 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-bkk-500 text-xs"
                   >
-                    <option value="marketing">Marketing</option>
+                    <option value="marketing">Marketing (Pemasaran)</option>
+                    <option value="penagihan">Penagihan (Account Officer)</option>
                     <option value="kacab">Kepala Cabang</option>
                     <option value="admin">Administrator</option>
                   </select>
@@ -222,13 +225,13 @@ export default function PenggunaView({ initialProfiles }: PenggunaViewProps) {
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Kode Marketing
+                    Kode Petugas
                   </label>
                   <input
                     type="text"
                     value={newMarketingCode}
                     onChange={(e) => setNewMarketingCode(e.target.value)}
-                    placeholder="MKT04"
+                    placeholder={newRole === 'penagihan' ? 'AO01' : 'MKT01'}
                     className="w-full min-h-[40px] px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-bkk-500 text-xs uppercase"
                   />
                 </div>

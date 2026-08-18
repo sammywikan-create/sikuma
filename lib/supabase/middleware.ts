@@ -69,14 +69,36 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     if (role === 'marketing') {
       url.pathname = '/kunjungan';
+    } else if (role === 'penagihan') {
+      url.pathname = '/penagihan';
     } else {
       url.pathname = '/dasbor';
     }
     return NextResponse.redirect(url);
   }
 
-  // Proteksi rute dasbor untuk marketing
-  if (pathname.startsWith('/dasbor') && role === 'marketing') {
+  // Proteksi rute dasbor untuk petugas lapangan
+  if (pathname.startsWith('/dasbor')) {
+    if (role === 'marketing') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/kunjungan';
+      return NextResponse.redirect(url);
+    }
+    if (role === 'penagihan') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/penagihan';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Proteksi isolasi rute marketing vs penagihan
+  if (pathname.startsWith('/kunjungan') && role === 'penagihan') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/penagihan';
+    return NextResponse.redirect(url);
+  }
+
+  if (pathname.startsWith('/penagihan') && role === 'marketing') {
     const url = request.nextUrl.clone();
     url.pathname = '/kunjungan';
     return NextResponse.redirect(url);
