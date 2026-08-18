@@ -24,6 +24,7 @@ interface SyncContextType {
   isSyncing: boolean;
   queuedVisits: QueuedVisit[];
   triggerManualSync: () => Promise<void>;
+  deleteQueuedVisit: (clientUuid: string) => Promise<void>;
   refreshQueueStatus: () => Promise<void>;
 }
 
@@ -35,6 +36,7 @@ const SyncContext = createContext<SyncContextType>({
   isSyncing: false,
   queuedVisits: [],
   triggerManualSync: async () => {},
+  deleteQueuedVisit: async () => {},
   refreshQueueStatus: async () => {},
 });
 
@@ -61,11 +63,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const runSync = useCallback(async () => {
+  const runSync = useCallback(async (forceAll: boolean = false) => {
     if (!navigator.onLine) return;
     setIsSyncing(true);
     try {
-      await processVisitQueue(refreshQueueStatus);
+      await processVisitQueue(refreshQueueStatus, forceAll);
       await refreshQueueStatus();
     } finally {
       setIsSyncing(false);
@@ -78,7 +80,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
     const handleOnline = () => {
       setIsOnline(true);
-      runSync();
+      runSync(false);
     };
 
     const handleOffline = () => {
@@ -90,7 +92,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
     // Jalankan sync saat pertama kali aplikasi dibuka jika online
     if (navigator.onLine) {
-      runSync();
+      runSync(false);
     }
 
     return () => {
@@ -104,7 +106,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       alert('Perangkat Anda masih dalam keadaan offline. Pastikan koneksi internet aktif.');
       return;
     }
-    await runSync();
+    await runSync(true); // force retry all stuck/failed visits
+  };
+
+  const deleteQueuedVisit = async (clientUuid: string) => {
+    const { removeQueuedVisit } = await import('@/lib/storage/db');
+    await removeQueuedVisit(clientUuid);
+    await refreshQueueStatus();
   };
 
   const isMemoryFull = queueTotalBytes >= MAX_QUEUE_BYTES;
@@ -119,6 +127,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         isSyncing,
         queuedVisits,
         triggerManualSync,
+        deleteQueuedVisit,
         refreshQueueStatus,
       }}
     >

@@ -65,8 +65,13 @@ export async function syncSingleVisit(
 
 /**
  * Memproses seluruh antrean kunjungan offline secara berurutan (FIFO)
+ * @param onProgress Callback untuk memperbarui UI
+ * @param forceRetryAll Jika true (sinkronisasi manual), reset semua kegagalan dan coba kirim ulang
  */
-export async function processVisitQueue(onProgress?: () => void): Promise<{
+export async function processVisitQueue(
+  onProgress?: () => void,
+  forceRetryAll: boolean = false
+): Promise<{
   processedCount: number;
   failedCount: number;
 }> {
@@ -87,8 +92,19 @@ export async function processVisitQueue(onProgress?: () => void): Promise<{
     const queue = await getQueuedVisits();
 
     for (const visit of queue) {
-      // Lewati jika sudah gagal permanen (5x) kecuali pengguna memicu manual
-      if (visit.status === 'failed' && visit.retry_count >= MAX_RETRIES) {
+      // Jika sinkronisasi manual dipicu, reset status gagal agar bisa dikirim kembali
+      if (forceRetryAll && visit.status === 'failed') {
+        await updateQueuedVisit(visit.client_uuid, {
+          status: 'pending',
+          retry_count: 0,
+          last_error: null,
+        });
+        visit.status = 'pending';
+        visit.retry_count = 0;
+      }
+
+      // Lewati jika sudah gagal permanen (5x) pada siklus background otomatis
+      if (!forceRetryAll && visit.status === 'failed' && visit.retry_count >= MAX_RETRIES) {
         continue;
       }
 
@@ -108,7 +124,7 @@ export async function processVisitQueue(onProgress?: () => void): Promise<{
         await updateQueuedVisit(visit.client_uuid, {
           status: newStatus,
           retry_count: nextRetry,
-          last_error: result.error || 'Galat jaringan saat mengirim data.',
+          last_error: result.error || 'Galat server saat mengirim data.',
         });
         failedCount++;
       }
