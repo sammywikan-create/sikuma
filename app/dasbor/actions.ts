@@ -86,123 +86,173 @@ export async function createMarketingUserAction(payload: {
   marketing_code: string;
   role: UserRole;
 }) {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: 'Sesi berakhir.' };
-  }
+    if (!user) {
+      return { error: 'Sesi Anda telah berakhir. Silakan masuk kembali.' };
+    }
 
-  const { data: profile } = (await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()) as { data: Pick<Profile, 'role'> | null };
+    const { data: profile } = (await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()) as { data: Pick<Profile, 'role'> | null };
 
-  if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
-    return { error: 'Hanya Kepala Cabang atau Admin yang dapat menambah pengguna baru.' };
-  }
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
+      return { error: 'Hanya Kepala Cabang atau Admin yang berhak menambah pengguna baru.' };
+    }
 
-  const adminClient = createSupabaseAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const password = payload.password || 'Password123!';
+    if (!supabaseUrl || !serviceRoleKey) {
+      return {
+        error:
+          'Kunci SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi di Environment Variables server.',
+      };
+    }
 
-  // 1. Buat auth user
-  const { data: newAuthUser, error: authErr } = await adminClient.auth.admin.createUser({
-    email: payload.email.trim(),
-    password: password.trim(),
-    email_confirm: true,
-  });
+    const adminClient = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
 
-  if (authErr || !newAuthUser.user) {
-    return { error: `Gagal membuat akun auth: ${authErr?.message || 'Error'}` };
-  }
+    const emailTrimmed = payload.email.trim().toLowerCase();
+    const codeTrimmed = payload.marketing_code?.trim().toUpperCase() || null;
 
-  // 2. Buat profil di tabel profiles
-  const { error: profileErr } = await adminClient.from('profiles').insert({
-    id: newAuthUser.user.id,
-    full_name: payload.full_name.trim(),
-    marketing_code: payload.marketing_code.trim().toUpperCase() || null,
-    role: payload.role,
-    is_active: true,
-  });
+    // Cek apakah kode petugas sudah dipakai
+    if (codeTrimmed) {
+      const { data: existingCode } = await adminClient
+        .from('profiles')
+        .select('marketing_code')
+        .eq('marketing_code', codeTrimmed)
+        .maybeSingle();
 
-  if (profileErr) {
-    return { error: `Gagal membuat data profil: ${profileErr.message}` };
-  }
+      if (existingCode) {
+        return { error: `Kode petugas "${codeTrimmed}" sudah digunakan oleh staf lain.` };
+      }
+    }
 
-  // 3. Catat audit_log
-  await adminClient.from('audit_log').insert({
-    actor_id: user.id,
-    action: 'user_created',
-    entity: 'profiles',
-    entity_id: newAuthUser.user.id,
-    payload: {
-      email: payload.email,
-      full_name: payload.full_name,
-      marketing_code: payload.marketing_code,
+    const password = payload.password?.trim() || 'Password123!';
+
+    // 1. Buat auth user di Supabase Auth
+    const { data: newAuthUser, error: authErr } = await adminClient.auth.admin.createUser({
+      email: emailTrimmed,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: payload.full_name.trim(),
+        role: payload.role,
+      },
+    });
+
+    if (authErr || !newAuthUser?.user) {
+      return {
+        error: `Gagal membuat akun: ${authErr?.message || 'Email mungkin sudah terdaftar.'}`,
+      };
+    }
+
+    // 2. Buat profil di tabel profiles
+    const { error: profileErr } = await adminClient.from('profiles').insert({
+      id: newAuthUser.user.id,
+      full_name: payload.full_name.trim(),
+      marketing_code: codeTrimmed,
       role: payload.role,
-      created_by_role: profile.role,
-    },
-  });
+      is_active: true,
+    });
 
-  revalidatePath('/dasbor/pengguna');
-  return { success: true };
+    if (profileErr) {
+      // Bersihkan user auth jika pembuatan profil gagal
+      await adminClient.auth.admin.deleteUser(newAuthUser.user.id);
+      return { error: `Gagal menyimpan profil: ${profileErr.message}` };
+    }
+
+    // 3. Catat audit_log
+    await adminClient.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'user_created',
+      entity: 'profiles',
+      entity_id: newAuthUser.user.id,
+      payload: {
+        email: emailTrimmed,
+        full_name: payload.full_name.trim(),
+        marketing_code: codeTrimmed,
+        role: payload.role,
+        created_by_role: profile.role,
+      },
+    });
+
+    revalidatePath('/dasbor/pengguna');
+    return { success: true };
+  } catch (err: unknown) {
+    console.error('Error in createMarketingUserAction:', err);
+    return { error: `Terjadi galat server: ${(err as Error).message}` };
+  }
 }
 
 export async function toggleUserStatusAction(userId: string, currentStatus: boolean) {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: 'Sesi berakhir.' };
+    if (!user) {
+      return { error: 'Sesi Anda telah berakhir.' };
+    }
+
+    const { data: profile } = (await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()) as { data: Pick<Profile, 'role'> | null };
+
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
+      return { error: 'Hanya Kepala Cabang atau Admin yang berhak mengubah status akun.' };
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return {
+        error:
+          'Kunci SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi di Environment Variables server.',
+      };
+    }
+
+    const adminClient = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
+
+    const newStatus = !currentStatus;
+
+    const { error: updateErr } = await adminClient
+      .from('profiles')
+      .update({ is_active: newStatus })
+      .eq('id', userId);
+
+    if (updateErr) {
+      return { error: `Gagal mengubah status pengguna: ${updateErr.message}` };
+    }
+
+    await adminClient.from('audit_log').insert({
+      actor_id: user.id,
+      action: newStatus ? 'user_activated' : 'user_deactivated',
+      entity: 'profiles',
+      entity_id: userId,
+      payload: { is_active: newStatus },
+    });
+
+    revalidatePath('/dasbor/pengguna');
+    return { success: true };
+  } catch (err: unknown) {
+    console.error('Error in toggleUserStatusAction:', err);
+    return { error: `Terjadi galat server: ${(err as Error).message}` };
   }
-
-  const { data: profile } = (await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()) as { data: Pick<Profile, 'role'> | null };
-
-  if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
-    return { error: 'Hanya Kepala Cabang atau Admin yang dapat mengubah status akun.' };
-  }
-
-  const adminClient = createSupabaseAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
-
-  const newStatus = !currentStatus;
-
-  const { error: updateErr } = await adminClient
-    .from('profiles')
-    .update({ is_active: newStatus })
-    .eq('id', userId);
-
-  if (updateErr) {
-    return { error: `Gagal mengubah status pengguna: ${updateErr.message}` };
-  }
-
-  await adminClient.from('audit_log').insert({
-    actor_id: user.id,
-    action: newStatus ? 'user_activated' : 'user_deactivated',
-    entity: 'profiles',
-    entity_id: userId,
-    payload: { is_active: newStatus },
-  });
-
-  revalidatePath('/dasbor/pengguna');
-  return { success: true };
 }
