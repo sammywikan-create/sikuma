@@ -230,6 +230,19 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
       auth: { persistSession: false },
     });
 
+    // Cegah penonaktifan akun Kepala Cabang dan Admin
+    const { data: targetProfile } = await adminClient
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (targetProfile && (targetProfile.role === 'kacab' || targetProfile.role === 'admin') && currentStatus) {
+      return {
+        error: 'Akun Kepala Cabang dan Administrator tidak dapat dinonaktifkan demi keamanan operasional sistem.',
+      };
+    }
+
     const newStatus = !currentStatus;
 
     const { error: updateErr } = await adminClient

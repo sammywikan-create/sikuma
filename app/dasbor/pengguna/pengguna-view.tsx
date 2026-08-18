@@ -141,16 +141,22 @@ export default function PenggunaView({ initialProfiles }: PenggunaViewProps) {
               </p>
             </div>
 
-            <button
-              onClick={() => handleToggleActive(p)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
-                p.is_active
-                  ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
-                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-              }`}
-            >
-              {p.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-            </button>
+            {p.role === 'marketing' || p.role === 'penagihan' ? (
+              <button
+                onClick={() => handleToggleActive(p)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                  p.is_active
+                    ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                }`}
+              >
+                {p.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+              </button>
+            ) : (
+              <span className="text-[11px] font-semibold text-slate-400 px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200/80">
+                🔒 Akun Utama
+              </span>
+            )}
           </div>
         ))}
       </div>
