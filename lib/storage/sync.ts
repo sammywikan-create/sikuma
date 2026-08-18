@@ -22,6 +22,8 @@ export async function syncSingleVisit(
       product: visit.product,
       outcome: visit.outcome,
       potential_value: visit.potential_value,
+      baki_debet: visit.baki_debet,
+      kolektibilitas: visit.kolektibilitas,
       notes: visit.notes,
       captured_at: visit.captured_at,
       lat: visit.lat,

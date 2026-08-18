@@ -18,6 +18,8 @@ export type OutcomeType =
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected';
 
+export type KolektibilitasType = 'kol_1' | 'kol_2' | 'kol_3' | 'kol_4' | 'kol_5';
+
 export interface Profile {
   id: string;
   full_name: string;
@@ -36,6 +38,8 @@ export interface Visit {
   product: ProductType;
   outcome: OutcomeType;
   potential_value: number | null;
+  baki_debet?: number | null;
+  kolektibilitas?: KolektibilitasType | null;
   notes: string | null;
   captured_at: string;
   received_at: string;
@@ -96,6 +100,8 @@ export type Database = {
           product: ProductType;
           outcome: OutcomeType;
           potential_value?: number | null;
+          baki_debet?: number | null;
+          kolektibilitas?: KolektibilitasType | null;
           notes?: string | null;
           captured_at: string;
           received_at?: string;

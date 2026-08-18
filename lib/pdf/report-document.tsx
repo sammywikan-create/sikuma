@@ -8,30 +8,33 @@ import {
   Image,
   StyleSheet,
 } from '@react-pdf/renderer';
-import { formatIndonesianDate, formatIndonesianDateRange } from '@/lib/utils/pdf-date';
+import {
+  formatIndonesianDate,
+  formatIndonesianDateRange,
+  formatIndonesianFullDateTime,
+} from '@/lib/utils/pdf-date';
 import { formatWIB } from '@/lib/utils/time';
 import { formatRupiah } from '@/lib/utils/format';
 import type { Visit, VisitPhoto, Profile } from '@/lib/types/database';
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 36,
-    paddingBottom: 44,
-    paddingHorizontal: 36,
-    fontSize: 9,
+    paddingTop: 32,
+    paddingBottom: 40,
+    paddingHorizontal: 32,
+    fontSize: 8.5,
     fontFamily: 'Helvetica',
     color: '#0f172a',
     backgroundColor: '#ffffff',
   },
-  // Universal Header / Footer
   footer: {
     position: 'absolute',
-    bottom: 20,
-    left: 36,
-    right: 36,
+    bottom: 18,
+    left: 32,
+    right: 32,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#94a3b8',
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
@@ -43,26 +46,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // 1. Cover Page
+  // 1. Sampul
   coverContainer: {
     flex: 1,
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 16,
   },
   coverHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   bankName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#0369a1',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   branchName: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: '#475569',
     marginTop: 2,
     textAlign: 'center',
@@ -71,30 +74,30 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 2,
     backgroundColor: '#0284c7',
-    marginTop: 10,
-    marginBottom: 40,
+    marginTop: 8,
+    marginBottom: 30,
   },
   coverTitleBlock: {
     alignItems: 'center',
-    marginVertical: 40,
-    paddingHorizontal: 20,
+    marginVertical: 20,
+    paddingHorizontal: 16,
   },
   mainTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#0f172a',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitlePeriod: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#0284c7',
     fontWeight: 'bold',
     textTransform: 'uppercase',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   dateRangeText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#334155',
     textAlign: 'center',
   },
@@ -104,14 +107,14 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 8,
     padding: 12,
-    width: '80%',
-    marginVertical: 20,
+    width: '85%',
+    marginVertical: 16,
   },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 4,
-    fontSize: 8.5,
+    fontSize: 8,
   },
   metaLabel: {
     color: '#64748b',
@@ -121,17 +124,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   signatureBlock: {
-    marginTop: 30,
+    marginTop: 20,
     alignItems: 'center',
     width: 200,
   },
   signTitle: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: '#64748b',
-    marginBottom: 50,
+    marginBottom: 40,
   },
   signName: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: 'bold',
     borderTopWidth: 1,
     borderTopColor: '#0f172a',
@@ -140,27 +143,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   signRole: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#64748b',
     marginTop: 2,
   },
 
-  // 2. Table Page
+  // 2. Page Titles & Tables
   pageHeader: {
-    marginBottom: 16,
+    marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#cbd5e1',
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   pageTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#0f172a',
   },
   pageSubtitle: {
-    fontSize: 8.5,
+    fontSize: 8,
     color: '#64748b',
-    marginTop: 2,
+    marginTop: 1.5,
   },
   table: {
     width: '100%',
@@ -174,118 +177,43 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     alignItems: 'center',
-    minHeight: 22,
+    minHeight: 20,
+    paddingVertical: 3,
   },
   tableHeaderRow: {
     backgroundColor: '#f1f5f9',
     borderBottomWidth: 1,
     borderBottomColor: '#94a3b8',
     fontWeight: 'bold',
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#334155',
   },
-  tableRowTotal: {
-    backgroundColor: '#f8fafc',
-    borderTopWidth: 1,
-    borderTopColor: '#94a3b8',
+  tableCell: {
+    paddingHorizontal: 4,
+    fontSize: 7.5,
+  },
+  tableCellBold: {
     fontWeight: 'bold',
-  },
-  colMarketing: { width: '22%', paddingLeft: 6 },
-  colVisits: { width: '8%', textAlign: 'center' },
-  colProspect: { width: '8%', textAlign: 'center' },
-  colExisting: { width: '8%', textAlign: 'center' },
-  colTagihan: { width: '8%', textAlign: 'center' },
-  colRealisasi: { width: '9%', textAlign: 'center' },
-  colPotensi: { width: '17%', textAlign: 'right', paddingRight: 6 },
-  colHari: { width: '6%', textAlign: 'center' },
-  colLate: { width: '7%', textAlign: 'center' },
-  colAnomaly: { width: '7%', textAlign: 'center' },
-
-  // 3. Highlight / Insights Page
-  highlightCard: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#0369a1',
-    marginBottom: 4,
-  },
-  highlightGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  subCard: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 6,
-    padding: 8,
-  },
-  subCardLabel: {
-    fontSize: 8,
-    color: '#64748b',
-  },
-  subCardValue: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginTop: 2,
   },
 
-  // 4. Marketing Section & Album
-  sectionCover: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderWidth: 2,
-    borderColor: '#0284c7',
-    borderRadius: 12,
-    padding: 30,
-    marginVertical: 40,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginTop: 10,
-  },
-  sectionBadge: {
-    backgroundColor: '#0284c7',
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-
-  // Album 2x2 Grid
+  // 3. Album 2x2
   albumGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   albumItem: {
-    width: '48%',
+    width: '48.5%',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 6,
-    padding: 6,
+    padding: 5,
     backgroundColor: '#ffffff',
   },
   photoBox: {
     width: '100%',
-    height: 140,
+    height: 135,
     backgroundColor: '#0f172a',
     borderRadius: 4,
     overflow: 'hidden',
@@ -297,46 +225,46 @@ const styles = StyleSheet.create({
     objectFit: 'cover',
   },
   captionLine1: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: 'bold',
     color: '#0f172a',
     marginBottom: 1,
   },
   captionLine2: {
-    fontSize: 7.5,
+    fontSize: 7,
     color: '#0369a1',
     marginBottom: 1,
   },
   captionLine3: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: '#475569',
     marginBottom: 1,
   },
   captionLine4: {
-    fontSize: 6.5,
+    fontSize: 6,
     fontFamily: 'Courier',
     color: '#64748b',
   },
 
-  // 5. Verification Sheet
+  // 4. Verification Sheet
   verifBox: {
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 8,
-    padding: 16,
-    minHeight: 160,
-    marginBottom: 20,
+    padding: 12,
+    minHeight: 140,
+    marginBottom: 16,
   },
   verifHeading: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
     color: '#0f172a',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   verifLine: {
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-    height: 24,
+    height: 22,
   },
 });
 
@@ -344,6 +272,7 @@ export interface PDFReportData {
   bankName: string;
   branchName: string;
   reportType: 'harian' | 'mingguan' | 'bulanan';
+  category?: 'semua' | 'pemasaran' | 'penagihan';
   startDate: string;
   endDate: string;
   printedAt: string;
@@ -370,11 +299,20 @@ export interface PDFReportData {
   }[];
 }
 
+const KOLEKTIBILITAS_LABEL: Record<string, string> = {
+  kol_1: 'Kol 1 (Lancar)',
+  kol_2: 'Kol 2 (DPK)',
+  kol_3: 'Kol 3 (Kurang Lancar)',
+  kol_4: 'Kol 4 (Diragukan)',
+  kol_5: 'Kol 5 (Macet)',
+};
+
 export function ReportPDFDocument({ data }: { data: PDFReportData }) {
   const {
     bankName,
     branchName,
     reportType,
+    category = 'semua',
     startDate,
     endDate,
     printedAt,
@@ -384,51 +322,32 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
     marketingSummaries,
   } = data;
 
-  // Hitung Total Rekap
-  const totalRow = marketingSummaries.reduce(
-    (acc, m) => ({
-      total_visits: acc.total_visits + m.total_visits,
-      prospects: acc.prospects + m.prospects,
-      existing: acc.existing + m.existing,
-      collection: acc.collection + m.collection,
-      realization: acc.realization + m.realization,
-      potential_value: acc.potential_value + m.potential_value,
-      late_count: acc.late_count + m.late_count,
-      anomaly_count: acc.anomaly_count + m.anomaly_count,
-    }),
-    {
-      total_visits: 0,
-      prospects: 0,
-      existing: 0,
-      collection: 0,
-      realization: 0,
-      potential_value: 0,
-      late_count: 0,
-      anomaly_count: 0,
-    }
-  );
+  // Filter Kunjungan sesuai Kategori
+  const marketingVisits = visits.filter((v) => v.visit_type !== 'penagihan');
+  const collectionVisits = visits.filter((v) => v.visit_type === 'penagihan');
 
-  // Cari Sorotan: Terbanyak & Tersedikit
-  const sortedByVisits = [...marketingSummaries].sort(
-    (a, b) => b.total_visits - a.total_visits
-  );
-  const mostActive = sortedByVisits[0];
-  const leastActive = sortedByVisits[sortedByVisits.length - 1];
-
-  // Kunjungan Beranomali
-  const anomalyVisits = visits.filter(
-    (v) => v.anomaly_flags && v.anomaly_flags.length > 0
-  );
+  const reportTitle =
+    category === 'penagihan'
+      ? 'LAPORAN PENAGIHAN ACCOUNT OFFICER (AO)'
+      : category === 'pemasaran'
+      ? 'LAPORAN KUNJUNGAN MARKETING'
+      : 'LAPORAN REKAPITULASI KUNJUNGAN MARKETING & PENAGIHAN';
 
   // Kelompokkan Kunjungan per Marketing untuk Album
   const visitsByMarketing = new Map<string, typeof visits>();
   marketingSummaries.forEach((m) => {
-    const mVisits = visits.filter((v) => v.marketing_id === m.marketing_id);
+    const mVisits = (
+      category === 'penagihan'
+        ? collectionVisits
+        : category === 'pemasaran'
+        ? marketingVisits
+        : visits
+    ).filter((v) => v.marketing_id === m.marketing_id);
     visitsByMarketing.set(m.marketing_id, mVisits);
   });
 
   return (
-    <Document title={`Laporan Kunjungan Marketing - ${data.reportType}`}>
+    <Document title={`${reportTitle} - Bank BKK`}>
       {/* ======================================================== */}
       {/* HALAMAN 1: SAMPUL                                         */}
       {/* ======================================================== */}
@@ -441,7 +360,7 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
           </View>
 
           <View style={styles.coverTitleBlock}>
-            <Text style={styles.mainTitle}>LAPORAN KUNJUNGAN MARKETING</Text>
+            <Text style={styles.mainTitle}>{reportTitle}</Text>
             <Text style={styles.subtitlePeriod}>
               PERIODE {reportType.toUpperCase()}
             </Text>
@@ -460,13 +379,13 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
               <Text style={styles.metaValue}>{printedBy}</Text>
             </View>
             <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Total Kunjungan Terekam</Text>
-              <Text style={styles.metaValue}>{visits.length} Kunjungan</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Total Realisasi Omzet Potensi</Text>
+              <Text style={styles.metaLabel}>Total Catatan Aktivitas</Text>
               <Text style={styles.metaValue}>
-                {formatRupiah(totalRow.potential_value)}
+                {category === 'penagihan'
+                  ? `${collectionVisits.length} Penagihan Debitur`
+                  : category === 'pemasaran'
+                  ? `${marketingVisits.length} Kunjungan Pemasaran`
+                  : `${visits.length} Kunjungan Lapangan`}
               </Text>
             </View>
           </View>
@@ -489,158 +408,163 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
       </Page>
 
       {/* ======================================================== */}
-      {/* HALAMAN 2: REKAP KINERJA PER MARKETING                   */}
+      {/* HALAMAN 2A: TABEL LAPORAN KUNJUNGAN MARKETING             */}
+      {/* (Kolom: Nomor, Waktu, Marketing, Nasabah, Alamat, Tujuan, Ket) */}
       {/* ======================================================== */}
-      <Page size="A4" style={styles.page}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>Rekapitulasi Kinerja Marketing</Text>
-          <Text style={styles.pageSubtitle}>
-            Periode: {formatIndonesianDateRange(startDate, endDate)}
-          </Text>
-        </View>
-
-        <View style={styles.table}>
-          <View style={[styles.tableRow, styles.tableHeaderRow]}>
-            <Text style={styles.colMarketing}>Marketing</Text>
-            <Text style={styles.colVisits}>Kunj</Text>
-            <Text style={styles.colProspect}>Prospek</Text>
-            <Text style={styles.colExisting}>Exist</Text>
-            <Text style={styles.colTagihan}>Tagih</Text>
-            <Text style={styles.colRealisasi}>Realisasi</Text>
-            <Text style={styles.colPotensi}>Potensi (Rp)</Text>
-            <Text style={styles.colHari}>Hari</Text>
-            <Text style={styles.colLate}>Lwt</Text>
-            <Text style={styles.colAnomaly}>Anom</Text>
+      {(category === 'pemasaran' || category === 'semua') && (
+        <Page size="A4" orientation="landscape" style={[styles.page, { paddingHorizontal: 24 }]}>
+          <View style={styles.pageHeader}>
+            <Text style={styles.pageTitle}>Laporan Kunjungan Marketing (Pemasaran Dana &amp; Kredit)</Text>
+            <Text style={styles.pageSubtitle}>
+              Periode: {formatIndonesianDateRange(startDate, endDate)} • Total: {marketingVisits.length} Kunjungan
+            </Text>
           </View>
 
-          {marketingSummaries.map((m) => (
-            <View key={m.marketing_id} style={styles.tableRow}>
-              <Text style={styles.colMarketing}>
-                {m.marketing_name} ({m.marketing_code})
-              </Text>
-              <Text style={styles.colVisits}>{m.total_visits}</Text>
-              <Text style={styles.colProspect}>{m.prospects}</Text>
-              <Text style={styles.colExisting}>{m.existing}</Text>
-              <Text style={styles.colTagihan}>{m.collection}</Text>
-              <Text style={styles.colRealisasi}>{m.realization}</Text>
-              <Text style={styles.colPotensi}>
-                {formatRupiah(m.potential_value)}
-              </Text>
-              <Text style={styles.colHari}>{m.active_days}</Text>
-              <Text style={styles.colLate}>{m.late_count}</Text>
-              <Text style={styles.colAnomaly}>{m.anomaly_count}</Text>
+          <View style={styles.table}>
+            <View style={[styles.tableRow, styles.tableHeaderRow]}>
+              <Text style={[styles.tableCell, { width: '4%', textAlign: 'center' }]}>No</Text>
+              <Text style={[styles.tableCell, { width: '22%' }]}>Waktu (Hari &amp; Tanggal)</Text>
+              <Text style={[styles.tableCell, { width: '13%' }]}>Marketing</Text>
+              <Text style={[styles.tableCell, { width: '17%' }]}>Nama Calon Nasabah</Text>
+              <Text style={[styles.tableCell, { width: '18%' }]}>Alamat</Text>
+              <Text style={[styles.tableCell, { width: '12%' }]}>Tujuan Pemasaran</Text>
+              <Text style={[styles.tableCell, { width: '14%' }]}>Keterangan</Text>
             </View>
-          ))}
 
-          {/* Baris Total */}
-          <View style={[styles.tableRow, styles.tableRowTotal]}>
-            <Text style={styles.colMarketing}>TOTAL</Text>
-            <Text style={styles.colVisits}>{totalRow.total_visits}</Text>
-            <Text style={styles.colProspect}>{totalRow.prospects}</Text>
-            <Text style={styles.colExisting}>{totalRow.existing}</Text>
-            <Text style={styles.colTagihan}>{totalRow.collection}</Text>
-            <Text style={styles.colRealisasi}>{totalRow.realization}</Text>
-            <Text style={styles.colPotensi}>
-              {formatRupiah(totalRow.potential_value)}
-            </Text>
-            <Text style={styles.colHari}>-</Text>
-            <Text style={styles.colLate}>{totalRow.late_count}</Text>
-            <Text style={styles.colAnomaly}>{totalRow.anomaly_count}</Text>
-          </View>
-        </View>
-
-        <View style={styles.footer} fixed>
-          <Text style={styles.confidentialTag}>INTERNAL - RAHASIA</Text>
-          <Text
-            render={({ pageNumber, totalPages }) =>
-              `Halaman ${pageNumber} dari ${totalPages}`
-            }
-          />
-        </View>
-      </Page>
-
-      {/* ======================================================== */}
-      {/* HALAMAN 3: SOROTAN & ANOMALI                              */}
-      {/* ======================================================== */}
-      <Page size="A4" style={styles.page}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>Sorotan Operasional &amp; Anomali</Text>
-          <Text style={styles.pageSubtitle}>
-            Evaluasi integritas pencatatan kunjungan
-          </Text>
-        </View>
-
-        <View style={styles.highlightGrid}>
-          <View style={styles.subCard}>
-            <Text style={styles.subCardLabel}>Kunjungan Terbanyak</Text>
-            <Text style={styles.subCardValue}>
-              {mostActive?.marketing_name || '-'} ({mostActive?.total_visits || 0})
-            </Text>
-          </View>
-          <View style={styles.subCard}>
-            <Text style={styles.subCardLabel}>Kunjungan Tersedikit</Text>
-            <Text style={styles.subCardValue}>
-              {leastActive?.marketing_name || '-'} ({leastActive?.total_visits || 0})
-            </Text>
-          </View>
-          <View style={styles.subCard}>
-            <Text style={styles.subCardLabel}>Kunjungan Terlambat</Text>
-            <Text style={styles.subCardValue}>
-              {totalRow.late_count} Kunjungan
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.highlightCard}>
-          <Text style={styles.cardTitle}>
-            Daftar Temuan Kunjungan Beranomali ({anomalyVisits.length})
-          </Text>
-          {anomalyVisits.length === 0 ? (
-            <Text style={{ fontSize: 8.5, color: '#64748b' }}>
-              Tidak ditemukan indikasi anomali pada periode ini.
-            </Text>
-          ) : (
-            anomalyVisits.slice(0, 10).map((av, idx) => (
-              <View
-                key={av.id}
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  paddingVertical: 3,
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#f1f5f9',
-                }}
-              >
-                <Text style={{ fontSize: 8, width: '45%' }}>
-                  {idx + 1}. {av.customer_name} ({av.marketing?.full_name})
-                </Text>
-                <Text style={{ fontSize: 7.5, width: '25%', color: '#64748b' }}>
-                  {formatWIB(av.captured_at)}
-                </Text>
-                <Text style={{ fontSize: 7.5, width: '30%', color: '#dc2626', fontWeight: 'bold' }}>
-                  {av.anomaly_flags?.join(', ')}
+            {marketingVisits.length === 0 ? (
+              <View style={[styles.tableRow, { justifyContent: 'center', padding: 8 }]}>
+                <Text style={{ fontSize: 7.5, color: '#94a3b8' }}>
+                  Tidak ada data kunjungan pemasaran pada periode ini.
                 </Text>
               </View>
-            ))
-          )}
-        </View>
+            ) : (
+              marketingVisits.map((v, idx) => (
+                <View key={v.id} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, { width: '4%', textAlign: 'center' }]}>
+                    {idx + 1}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '22%' }]}>
+                    {formatIndonesianFullDateTime(v.captured_at)}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '13%' }]}>
+                    {v.marketing?.full_name || 'Marketing'} ({v.marketing?.marketing_code || '-'})
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellBold, { width: '17%' }]}>
+                    {v.customer_name}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '18%', color: '#475569' }]}>
+                    {v.address || '-'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '12%', color: '#0369a1', fontWeight: 'bold' }]}>
+                    {v.product === 'kredit'
+                      ? 'Kredit'
+                      : v.product === 'tabungan'
+                      ? 'Dana (Tabungan)'
+                      : v.product === 'deposito'
+                      ? 'Dana (Deposito)'
+                      : 'Lainnya'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '14%', color: '#334155' }]}>
+                    {v.outcome.replace(/_/g, ' ')}
+                    {v.potential_value ? ` • ${formatRupiah(v.potential_value)}` : ''}
+                    {v.notes ? ` (${v.notes})` : ''}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
 
-        <View style={styles.footer} fixed>
-          <Text style={styles.confidentialTag}>INTERNAL - RAHASIA</Text>
-          <Text
-            render={({ pageNumber, totalPages }) =>
-              `Halaman ${pageNumber} dari ${totalPages}`
-            }
-          />
-        </View>
-      </Page>
+          <View style={styles.footer} fixed>
+            <Text style={styles.confidentialTag}>INTERNAL - RAHASIA</Text>
+            <Text
+              render={({ pageNumber, totalPages }) =>
+                `Halaman ${pageNumber} dari ${totalPages}`
+              }
+            />
+          </View>
+        </Page>
+      )}
 
       {/* ======================================================== */}
-      {/* HALAMAN 4+: ALBUM FOTO PER MARKETING (GRID 2x2)          */}
+      {/* HALAMAN 2B: TABEL LAPORAN PENAGIHAN AO                   */}
+      {/* (Kolom: Nomor, Waktu, AO, Debitur, Alamat, Baki Debet, Kolektibilitas, Ket) */}
+      {/* ======================================================== */}
+      {(category === 'penagihan' || category === 'semua') && (
+        <Page size="A4" orientation="landscape" style={[styles.page, { paddingHorizontal: 24 }]}>
+          <View style={styles.pageHeader}>
+            <Text style={styles.pageTitle}>Laporan Penagihan Account Officer (AO)</Text>
+            <Text style={styles.pageSubtitle}>
+              Periode: {formatIndonesianDateRange(startDate, endDate)} • Total: {collectionVisits.length} Penagihan
+            </Text>
+          </View>
+
+          <View style={styles.table}>
+            <View style={[styles.tableRow, styles.tableHeaderRow]}>
+              <Text style={[styles.tableCell, { width: '4%', textAlign: 'center' }]}>No</Text>
+              <Text style={[styles.tableCell, { width: '21%' }]}>Waktu (Hari &amp; Tanggal)</Text>
+              <Text style={[styles.tableCell, { width: '12%' }]}>AO</Text>
+              <Text style={[styles.tableCell, { width: '16%' }]}>Nama Debitur</Text>
+              <Text style={[styles.tableCell, { width: '16%' }]}>Alamat</Text>
+              <Text style={[styles.tableCell, { width: '11%', textAlign: 'right' }]}>Baki Debet</Text>
+              <Text style={[styles.tableCell, { width: '10%', textAlign: 'center' }]}>Kolektibilitas</Text>
+              <Text style={[styles.tableCell, { width: '10%' }]}>Keterangan</Text>
+            </View>
+
+            {collectionVisits.length === 0 ? (
+              <View style={[styles.tableRow, { justifyContent: 'center', padding: 8 }]}>
+                <Text style={{ fontSize: 7.5, color: '#94a3b8' }}>
+                  Tidak ada data penagihan pada periode ini.
+                </Text>
+              </View>
+            ) : (
+              collectionVisits.map((v, idx) => (
+                <View key={v.id} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, { width: '4%', textAlign: 'center' }]}>
+                    {idx + 1}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '21%' }]}>
+                    {formatIndonesianFullDateTime(v.captured_at)}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '12%' }]}>
+                    {v.marketing?.full_name || 'AO'} ({v.marketing?.marketing_code || '-'})
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellBold, { width: '16%' }]}>
+                    {v.customer_name}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '16%', color: '#475569' }]}>
+                    {v.address || '-'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '11%', textAlign: 'right', fontWeight: 'bold' }]}>
+                    {v.baki_debet ? formatRupiah(v.baki_debet) : v.potential_value ? formatRupiah(v.potential_value) : '-'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '10%', textAlign: 'center', color: '#b45309', fontWeight: 'bold' }]}>
+                    {v.kolektibilitas ? KOLEKTIBILITAS_LABEL[v.kolektibilitas] || v.kolektibilitas : 'Kol 1'}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: '10%', color: '#334155' }]}>
+                    {v.outcome.replace(/_/g, ' ')}
+                    {v.notes ? ` (${v.notes})` : ''}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+
+          <View style={styles.footer} fixed>
+            <Text style={styles.confidentialTag}>INTERNAL - RAHASIA</Text>
+            <Text
+              render={({ pageNumber, totalPages }) =>
+                `Halaman ${pageNumber} dari ${totalPages}`
+              }
+            />
+          </View>
+        </Page>
+      )}
+
+      {/* ======================================================== */}
+      {/* HALAMAN 3+: ALBUM FOTO KISI 2x2 PER MARKETING            */}
       {/* ======================================================== */}
       {marketingSummaries.map((m) => {
         const mVisits = visitsByMarketing.get(m.marketing_id) || [];
-        // Flatten photos with visit context
         const photoItems: {
           visit: (typeof visits)[0];
           photo: (typeof visits)[0]['visit_photos'][0];
@@ -652,7 +576,8 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
           });
         });
 
-        // Split photos into chunks of 4 (2x2 grid per page)
+        if (photoItems.length === 0) return null;
+
         const photoPages: (typeof photoItems)[] = [];
         for (let i = 0; i < photoItems.length; i += 4) {
           photoPages.push(photoItems.slice(i, i + 4));
@@ -660,36 +585,6 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
 
         return (
           <React.Fragment key={m.marketing_id}>
-            {/* Halaman Pembatas Marketing */}
-            <Page size="A4" style={styles.page}>
-              <View style={styles.sectionCover}>
-                <Text style={styles.sectionBadge}>
-                  KODE: {m.marketing_code}
-                </Text>
-                <Text style={styles.sectionTitle}>{m.marketing_name}</Text>
-                <Text
-                  style={{
-                    fontSize: 9,
-                    color: '#64748b',
-                    marginTop: 6,
-                    textAlign: 'center',
-                  }}
-                >
-                  Total Kunjungan: {m.total_visits} • Realisasi: {m.realization} • Potensi: {formatRupiah(m.potential_value)}
-                </Text>
-              </View>
-
-              <View style={styles.footer} fixed>
-                <Text style={styles.confidentialTag}>INTERNAL - RAHASIA</Text>
-                <Text
-                  render={({ pageNumber, totalPages }) =>
-                    `Halaman ${pageNumber} dari ${totalPages}`
-                  }
-                />
-              </View>
-            </Page>
-
-            {/* Halaman-Halaman Album Foto (4 Foto per Halaman) */}
             {photoPages.map((chunk, pageIdx) => (
               <Page key={`${m.marketing_id}_album_${pageIdx}`} size="A4" style={styles.page}>
                 <View style={styles.pageHeader}>
@@ -711,7 +606,7 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
                           <Text
                             style={{
                               color: '#94a3b8',
-                              fontSize: 8,
+                              fontSize: 7.5,
                               textAlign: 'center',
                               marginVertical: 'auto',
                             }}
@@ -726,7 +621,9 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
                         {visit.customer_name} — {visit.visit_type.replace(/_/g, ' ')}
                       </Text>
                       <Text style={styles.captionLine2}>
-                        Hasil: {visit.outcome.replace(/_/g, ' ')} | Produk: {visit.product}
+                        {visit.visit_type === 'penagihan'
+                          ? `Baki Debet: ${formatRupiah(visit.baki_debet || visit.potential_value || 0)} | ${KOLEKTIBILITAS_LABEL[visit.kolektibilitas || 'kol_1'] || 'Kol 1'}`
+                          : `Hasil: ${visit.outcome.replace(/_/g, ' ')} | Produk: ${visit.product}`}
                       </Text>
                       <Text style={styles.captionLine3}>
                         {visit.address || 'Alamat lokasi tercatat'}
@@ -753,7 +650,7 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
       })}
 
       {/* ======================================================== */}
-      {/* HALAMAN TERAKHIR: LEMBAR VERIFIKASI KEPALA CABANG        */}
+      {/* HALAMAN TERAKHIR: LEMBAR VERIFIKASI PENGESAHAN           */}
       {/* ======================================================== */}
       <Page size="A4" style={styles.page}>
         <View style={styles.pageHeader}>
@@ -777,14 +674,14 @@ export function ReportPDFDocument({ data }: { data: PDFReportData }) {
           style={{
             flexDirection: 'row',
             justifyContent: 'flex-end',
-            marginTop: 40,
+            marginTop: 30,
           }}
         >
           <View style={{ width: 220, alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, color: '#334155', marginBottom: 6 }}>
+            <Text style={{ fontSize: 8.5, color: '#334155', marginBottom: 5 }}>
               Semarang, {formatIndonesianDate(new Date())}
             </Text>
-            <Text style={{ fontSize: 9, color: '#64748b', marginBottom: 50 }}>
+            <Text style={{ fontSize: 8.5, color: '#64748b', marginBottom: 45 }}>
               Kepala Cabang,
             </Text>
             <Text style={styles.signName}>{kacabName}</Text>

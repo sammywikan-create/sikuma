@@ -39,6 +39,8 @@ interface IncomingVisitPayload {
   product: ProductType;
   outcome: OutcomeType;
   potential_value?: number | null;
+  baki_debet?: number | null;
+  kolektibilitas?: 'kol_1' | 'kol_2' | 'kol_3' | 'kol_4' | 'kol_5' | null;
   notes?: string | null;
   captured_at: string;
   lat: number;
@@ -294,6 +296,8 @@ export async function POST(request: Request) {
         product: body.product,
         outcome: body.outcome,
         potential_value: body.potential_value ? Number(body.potential_value) : null,
+        baki_debet: body.baki_debet ? Number(body.baki_debet) : null,
+        kolektibilitas: body.kolektibilitas || null,
         notes: body.notes?.trim() || null,
         captured_at: capturedDate.toISOString(),
         received_at: receivedAt.toISOString(),

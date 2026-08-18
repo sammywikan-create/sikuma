@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.visits (
     product TEXT NOT NULL CHECK (product IN ('tabungan', 'deposito', 'kredit', 'lainnya')),
     outcome TEXT NOT NULL CHECK (outcome IN ('berminat', 'follow_up', 'realisasi', 'tidak_berminat', 'tidak_ditemui')),
     potential_value NUMERIC(18,2),
+    baki_debet NUMERIC(18,2),
+    kolektibilitas TEXT CHECK (kolektibilitas IN ('kol_1', 'kol_2', 'kol_3', 'kol_4', 'kol_5')),
     notes TEXT,
     captured_at TIMESTAMPTZ NOT NULL,
     received_at TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -268,7 +268,7 @@ export default function DashboardView({
   // 5. Unduh Laporan PDF
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = (kategori: 'semua' | 'pemasaran' | 'penagihan' = 'semua') => {
     setIsDownloadingPdf(true);
 
     const now = new Date();
@@ -298,6 +298,7 @@ export default function DashboardView({
       dari,
       sampai,
       jenis,
+      kategori,
       marketing: selectedMarketing,
     });
 
@@ -307,29 +308,38 @@ export default function DashboardView({
 
   return (
     <div className="space-y-5 pb-12">
-      {/* Bar Unduh Laporan PDF */}
-      <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-bkk-900 to-bkk-800 text-white rounded-2xl shadow-md">
-        <div>
-          <h2 className="text-xs font-bold flex items-center gap-1.5">
-            <span>📄</span> Cetak Laporan Album PDF Resmi
-          </h2>
-          <p className="text-[10px] text-bkk-200 mt-0.5">
-            Format A4 portrait resmi dengan album kisi 2x2 &amp; lembar pengesahan
-          </p>
+      {/* Bar Unduh Laporan PDF Resmi */}
+      <div className="p-4 bg-gradient-to-r from-bkk-900 to-bkk-800 text-white rounded-2xl shadow-md space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold flex items-center gap-1.5">
+              <span>📄</span> Cetak Laporan Resmi Bank BKK (A4)
+            </h2>
+            <p className="text-[11px] text-bkk-200 mt-0.5">
+              Laporan terstruktur dengan tabel komprehensif &amp; lembar pengesahan
+            </p>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDownloadPdf}
-          disabled={isDownloadingPdf}
-          className="px-3.5 py-2 bg-white text-bkk-900 hover:bg-bkk-50 active:scale-95 font-bold rounded-xl text-xs shadow-sm transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
-        >
-          {isDownloadingPdf ? (
-            <span>Membuat PDF...</span>
-          ) : (
-            <span>Unduh PDF A4 ⬇</span>
-          )}
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => handleDownloadPdf('pemasaran')}
+            disabled={isDownloadingPdf}
+            className="px-3.5 py-2.5 bg-white text-bkk-900 hover:bg-bkk-50 active:scale-95 font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <span>📄</span> Unduh Laporan Pemasaran (Kredit/Dana)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDownloadPdf('penagihan')}
+            disabled={isDownloadingPdf}
+            className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <span>💳</span> Unduh Laporan Penagihan (AO)
+          </button>
+        </div>
       </div>
 
       {/* 1. Panel Metrik Angka Atas (KPIs) */}
@@ -756,14 +766,29 @@ export default function DashboardView({
                 </div>
               </div>
 
-              {activeModalVisit.potential_value && (
+              {activeModalVisit.visit_type === 'penagihan' ? (
+                <div className="grid grid-cols-2 gap-2 p-2 bg-amber-50/70 border border-amber-200/60 rounded-xl">
+                  <div>
+                    <span className="text-amber-800/70 block text-[10px]">Baki Debet</span>
+                    <span className="font-bold text-amber-900">
+                      {formatRupiah(activeModalVisit.baki_debet || activeModalVisit.potential_value || 0)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-amber-800/70 block text-[10px]">Kolektibilitas</span>
+                    <span className="font-bold text-amber-900 uppercase">
+                      {activeModalVisit.kolektibilitas ? activeModalVisit.kolektibilitas.replace(/_/g, ' ') : 'Kol 1'}
+                    </span>
+                  </div>
+                </div>
+              ) : activeModalVisit.potential_value ? (
                 <div>
                   <span className="text-slate-400 block text-[10px]">Nilai Potensi</span>
                   <span className="font-bold text-emerald-700">
                     {formatRupiah(activeModalVisit.potential_value)}
                   </span>
                 </div>
-              )}
+              ) : null}
 
               {activeModalVisit.notes && (
                 <div>

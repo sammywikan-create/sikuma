@@ -37,6 +37,8 @@ export interface QueuedVisit {
   product: ProductType;
   outcome: OutcomeType;
   potential_value: number | null;
+  baki_debet?: number | null;
+  kolektibilitas?: 'kol_1' | 'kol_2' | 'kol_3' | 'kol_4' | 'kol_5' | null;
   notes: string | null;
   captured_at: string;
   lat: number;

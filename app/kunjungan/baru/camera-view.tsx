@@ -11,7 +11,7 @@ import {
 } from '@/lib/storage/db';
 import { formatThousandSeparator, parseThousandSeparator, formatRupiah } from '@/lib/utils/format';
 import { useSync } from '@/components/offline/sync-provider';
-import type { VisitType, ProductType, OutcomeType } from '@/lib/types/database';
+import type { VisitType, ProductType, OutcomeType, KolektibilitasType } from '@/lib/types/database';
 
 interface CameraViewProps {
   profile: {
@@ -68,6 +68,8 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
   const [product, setProduct] = useState<ProductType>('tabungan');
   const [outcome, setOutcome] = useState<OutcomeType>('berminat');
   const [potentialValueRaw, setPotentialValueRaw] = useState<string>('');
+  const [bakiDebetRaw, setBakiDebetRaw] = useState<string>('');
+  const [kolektibilitas, setKolektibilitas] = useState<'kol_1' | 'kol_2' | 'kol_3' | 'kol_4' | 'kol_5'>('kol_1');
   const [notes, setNotes] = useState<string>('');
 
   // State Pengiriman & Konfirmasi
@@ -380,6 +382,7 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
 
       const primaryPhoto = photos[0];
       const potentialNum = parseThousandSeparator(potentialValueRaw);
+      const bakiDebetNum = parseThousandSeparator(bakiDebetRaw);
       const clientUuid = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
       // Jika offline langsung simpan ke IndexedDB Queue
@@ -391,6 +394,8 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
           product,
           outcome,
           potential_value: potentialNum,
+          baki_debet: bakiDebetNum,
+          kolektibilitas: visitType === 'penagihan' ? kolektibilitas : null,
           notes: notes.trim() || null,
           captured_at: primaryPhoto.captured_at,
           lat: primaryPhoto.lat,
@@ -430,6 +435,8 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
           product,
           outcome,
           potential_value: potentialNum,
+          baki_debet: bakiDebetNum,
+          kolektibilitas: visitType === 'penagihan' ? kolektibilitas : null,
           notes: notes.trim() || null,
           captured_at: primaryPhoto.captured_at,
           lat: primaryPhoto.lat,
@@ -824,10 +831,10 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
           </div>
         )}
 
-        {/* Nama Nasabah */}
+        {/* Nama Nasabah / Debitur */}
         <div>
           <label htmlFor="customer_name" className="block text-xs font-medium text-slate-300 mb-1.5">
-            Nama Nasabah / Usaha <span className="text-red-400">*</span>
+            {visitType === 'penagihan' ? 'Nama Debitur *' : 'Nama Calon Nasabah / Usaha *'}
           </label>
           <input
             id="customer_name"
@@ -835,12 +842,16 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
             required
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Contoh: Toko Berkah / Bpk. Sutrisno"
+            placeholder={
+              visitType === 'penagihan'
+                ? 'Contoh: Bpk. Sutrisno (Debitur)'
+                : 'Contoh: Toko Berkah / Bpk. Sutrisno'
+            }
             className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-bkk-500 text-base smooth-transition"
           />
         </div>
 
-        {/* Jenis Kunjungan & Produk */}
+        {/* Jenis Kunjungan & Tujuan Pemasaran / Produk */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="visit_type" className="block text-xs font-medium text-slate-300 mb-1.5">
@@ -852,9 +863,9 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
               onChange={(e) => setVisitType(e.target.value as VisitType)}
               className="w-full min-h-[44px] px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-bkk-500 text-sm smooth-transition"
             >
-              <option value="prospek_baru">Prospek Baru</option>
+              <option value="prospek_baru">Prospek Baru (Pemasaran)</option>
               <option value="nasabah_existing">Nasabah Existing</option>
-              <option value="penagihan">Penagihan</option>
+              <option value="penagihan">Penagihan (AO)</option>
               <option value="survei_jaminan">Survei Jaminan</option>
               <option value="maintenance">Maintenance</option>
             </select>
@@ -862,7 +873,7 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
 
           <div>
             <label htmlFor="product" className="block text-xs font-medium text-slate-300 mb-1.5">
-              Produk <span className="text-red-400">*</span>
+              {visitType === 'penagihan' ? 'Fasilitas Kredit' : 'Tujuan Pemasaran'} <span className="text-red-400">*</span>
             </label>
             <select
               id="product"
@@ -870,19 +881,57 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
               onChange={(e) => setProduct(e.target.value as ProductType)}
               className="w-full min-h-[44px] px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-bkk-500 text-sm smooth-transition"
             >
-              <option value="tabungan">Tabungan</option>
-              <option value="deposito">Deposito</option>
               <option value="kredit">Kredit</option>
+              <option value="tabungan">Dana - Tabungan</option>
+              <option value="deposito">Dana - Deposito</option>
               <option value="lainnya">Lainnya</option>
             </select>
           </div>
         </div>
 
+        {/* Field Khusus Penagihan: Baki Debet & Kolektibilitas */}
+        {visitType === 'penagihan' ? (
+          <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-2xl">
+            <div>
+              <label htmlFor="baki_debet" className="block text-xs font-medium text-slate-300 mb-1.5">
+                Baki Debet (Rp)
+              </label>
+              <input
+                id="baki_debet"
+                type="text"
+                inputMode="numeric"
+                value={bakiDebetRaw}
+                onChange={(e) => setBakiDebetRaw(formatThousandSeparator(e.target.value))}
+                placeholder="0"
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-bkk-500 text-base smooth-transition"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="kolektibilitas" className="block text-xs font-medium text-slate-300 mb-1.5">
+                Kolektibilitas
+              </label>
+              <select
+                id="kolektibilitas"
+                value={kolektibilitas}
+                onChange={(e) => setKolektibilitas(e.target.value as KolektibilitasType)}
+                className="w-full min-h-[44px] px-2.5 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-bkk-500 text-xs smooth-transition"
+              >
+                <option value="kol_1">Kol 1 (Lancar)</option>
+                <option value="kol_2">Kol 2 (DPK)</option>
+                <option value="kol_3">Kol 3 (Kurang Lancar)</option>
+                <option value="kol_4">Kol 4 (Diragukan)</option>
+                <option value="kol_5">Kol 5 (Macet)</option>
+              </select>
+            </div>
+          </div>
+        ) : null}
+
         {/* Hasil Kunjungan & Nilai Potensi */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="outcome" className="block text-xs font-medium text-slate-300 mb-1.5">
-              Hasil Kunjungan <span className="text-red-400">*</span>
+              Hasil Pertemuan <span className="text-red-400">*</span>
             </label>
             <select
               id="outcome"
@@ -890,17 +939,17 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
               onChange={(e) => setOutcome(e.target.value as OutcomeType)}
               className="w-full min-h-[44px] px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white focus:outline-none focus:ring-2 focus:ring-bkk-500 text-sm smooth-transition"
             >
-              <option value="berminat">Berminat</option>
+              <option value="berminat">Berminat / Janji Bayar</option>
               <option value="follow_up">Follow Up</option>
-              <option value="realisasi">Realisasi</option>
-              <option value="tidak_berminat">Tidak Berminat</option>
+              <option value="realisasi">Realisasi / Bayar Lunas</option>
+              <option value="tidak_berminat">Tidak Berminat / Menolak</option>
               <option value="tidak_ditemui">Tidak Ditemui</option>
             </select>
           </div>
 
           <div>
             <label htmlFor="potential_value" className="block text-xs font-medium text-slate-300 mb-1.5">
-              Nilai Potensi (Rp)
+              {visitType === 'penagihan' ? 'Nominal Bayar (Rp)' : 'Nilai Potensi (Rp)'}
             </label>
             <input
               id="potential_value"

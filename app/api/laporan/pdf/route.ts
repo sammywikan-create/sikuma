@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     // 2. Parse Query Parameters
     const { searchParams } = new URL(request.url);
     const jenis = (searchParams.get('jenis') || 'bulanan') as 'harian' | 'mingguan' | 'bulanan';
+    const kategori = (searchParams.get('kategori') || 'semua') as 'semua' | 'pemasaran' | 'penagihan';
     const dari = searchParams.get('dari') || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().substring(0, 10);
     const sampai = searchParams.get('sampai') || new Date().toISOString().substring(0, 10);
     const marketingFilter = searchParams.get('marketing');
@@ -101,6 +102,12 @@ export async function GET(request: NextRequest) {
       .gte('captured_at', startDate.toISOString())
       .lte('captured_at', endDate.toISOString())
       .order('captured_at', { ascending: false });
+
+    if (kategori === 'penagihan') {
+      visitQuery = visitQuery.eq('visit_type', 'penagihan');
+    } else if (kategori === 'pemasaran') {
+      visitQuery = visitQuery.neq('visit_type', 'penagihan');
+    }
 
     if (marketingFilter && marketingFilter !== 'semua') {
       const ids = marketingFilter.split(',');
@@ -253,6 +260,7 @@ export async function GET(request: NextRequest) {
       bankName,
       branchName,
       reportType: jenis,
+      category: kategori,
       startDate: dari,
       endDate: sampai,
       printedAt: new Date().toISOString(),
@@ -266,7 +274,14 @@ export async function GET(request: NextRequest) {
     const docElement = React.createElement(ReportPDFDocument, { data: reportData });
     const pdfBuffer = await renderToBuffer(docElement as unknown as ReactElement<DocumentProps>);
 
-    const pdfFileName = `Laporan_Kunjungan_${jenis}_${dari}_${sampai}.pdf`;
+    const prefix =
+      kategori === 'penagihan'
+        ? 'Laporan_Penagihan_AO'
+        : kategori === 'pemasaran'
+        ? 'Laporan_Kunjungan_Marketing'
+        : 'Laporan_Kunjungan_Rekap';
+
+    const pdfFileName = `${prefix}_${jenis}_${dari}_${sampai}.pdf`;
 
     return new NextResponse(pdfBuffer as unknown as BodyInit, {
       headers: {
