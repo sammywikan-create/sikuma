@@ -125,21 +125,42 @@ export default function AnomaliView({
     }
   };
 
+  const handleExportCsv = () => {
+    const params = new URLSearchParams({
+      source: 'anomali',
+      shortcut: dateShortcut,
+      dari: customDari,
+      sampai: customSampai,
+      flag: selectedFlag,
+    });
+    window.open(`/api/laporan/csv?${params.toString()}`, '_blank');
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
     <div className="space-y-4 pb-12">
       {/* 1. Header Info Anomali */}
-      <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl">⚠️</span>
-          <h2 className="text-sm font-bold text-amber-950">
-            Pusat Pengawasan Anomali Kunjungan ({totalCount} Kasus)
-          </h2>
+      <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">⚠️</span>
+            <h2 className="text-sm font-bold text-amber-950">
+              Pusat Pengawasan Anomali Kunjungan ({totalCount} Kasus)
+            </h2>
+          </div>
+          <p className="text-xs text-amber-800">
+            Daftar seluruh kunjungan yang terindikasi mencurigakan menurut perhitungan integritas sistem.
+          </p>
         </div>
-        <p className="text-xs text-amber-800">
-          Daftar seluruh kunjungan yang terindikasi mencurigakan menurut perhitungan integritas sistem (akurasi rendah, kecepatan tidak wajar, lokasi kembar, foto duplikat, atau keterlambatan unggah).
-        </p>
+
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          className="px-4 py-2 bg-amber-800 hover:bg-amber-900 active:bg-amber-950 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto shrink-0"
+        >
+          <span>📊</span> Ekspor CSV Anomali
+        </button>
       </div>
 
       {/* 2. Bar Filter Rentang Tanggal & Kategori Anomali */}

@@ -280,19 +280,53 @@ export default function DashboardView({
     setTimeout(() => setIsDownloadingPdf(false), 2000);
   };
 
+  const handleExportCsv = () => {
+    const now = new Date();
+    let dari = customDari || getWIBDateString(now);
+    let sampai = customSampai || getWIBDateString(now);
+
+    if (dateShortcut === 'hari_ini') {
+      dari = getWIBDateString(now);
+      sampai = getWIBDateString(now);
+    } else if (dateShortcut === '7_hari') {
+      const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      dari = getWIBDateString(past7);
+      sampai = getWIBDateString(now);
+    } else if (dateShortcut === '30_hari') {
+      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      dari = getWIBDateString(past30);
+      sampai = getWIBDateString(now);
+    }
+
+    const params = new URLSearchParams({
+      source: 'dasbor',
+      shortcut: dateShortcut,
+      dari,
+      sampai,
+      marketing: selectedMarketing,
+      status: selectedStatus,
+      visit_type: selectedVisitType,
+      product: selectedProduct,
+      anomali: selectedAnomali,
+      q: searchQuery,
+    });
+
+    window.open(`/api/laporan/csv?${params.toString()}`, '_blank');
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
     <div className="space-y-5 pb-12">
-      {/* Bar Unduh Laporan PDF Resmi */}
+      {/* Bar Unduh Laporan PDF Resmi & Ekspor CSV */}
       <div className="p-4 bg-gradient-to-r from-bkk-900 to-bkk-800 text-white rounded-2xl shadow-md space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold flex items-center gap-1.5">
-              <span>📄</span> Cetak Laporan Resmi Bank BKK (A4)
+              <span>📄</span> Cetak Laporan Resmi &amp; Ekspor Data Bank BKK
             </h2>
             <p className="text-xs text-slate-300">
-              Dokumen PDF rekapitulasi audit lengkap dengan watermark dan tanda tangan digital.
+              Dokumen PDF rekapitulasi audit dan berkas spreadsheet CSV (Excel UTF-8 BOM) sesuai filter aktif.
             </p>
           </div>
           {isDownloadingPdf && (
@@ -309,7 +343,7 @@ export default function DashboardView({
             onClick={() => handleDownloadPdf('semua')}
             className="px-3 py-1.5 bg-bkk-600 hover:bg-bkk-500 active:bg-bkk-700 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
           >
-            📥 Unduh Rekap Gabungan
+            📥 Unduh PDF Gabungan
           </button>
           <button
             type="button"
@@ -317,7 +351,7 @@ export default function DashboardView({
             onClick={() => handleDownloadPdf('pemasaran')}
             className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
           >
-            📈 Unduh Laporan Pemasaran
+            📈 Unduh PDF Pemasaran
           </button>
           <button
             type="button"
@@ -325,7 +359,14 @@ export default function DashboardView({
             onClick={() => handleDownloadPdf('penagihan')}
             className="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 active:bg-amber-800 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
           >
-            📋 Unduh Laporan Penagihan AO
+            📋 Unduh PDF Penagihan
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-emerald-300 rounded-xl text-xs font-bold transition shadow-sm border border-slate-600 cursor-pointer flex items-center gap-1.5 ml-auto"
+          >
+            <span>📊</span> Ekspor CSV (Excel)
           </button>
         </div>
       </div>
