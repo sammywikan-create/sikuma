@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { formatWIB } from '@/lib/utils/time';
+import { formatWIB, getWIBDateString, getWIBDayBoundsUtc, getWIBDateParts } from '@/lib/utils/time';
 import { formatRupiah } from '@/lib/utils/format';
 import { verifyVisitAction } from './actions';
 import type { Visit, VisitPhoto, Profile, VerificationStatus } from '@/lib/types/database';
@@ -35,6 +35,7 @@ type SortField =
 export default function DashboardView({
   initialVisits,
   marketings,
+  userRole,
 }: DashboardViewProps) {
   // Realtime Live Visits State
   const [visitsList, setVisitsList] = useState<DashboardVisit[]>(initialVisits);
@@ -83,11 +84,7 @@ export default function DashboardView({
   }, []);
   // State Filter
   const [dateShortcut, setDateShortcut] = useState<DateShortcut>('hari_ini');
-  const [customDate, setCustomDate] = useState(() => {
-    const d = new Date();
-    const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-    return wib.toISOString().substring(0, 10);
-  });
+  const [customDate, setCustomDate] = useState(() => getWIBDateString(new Date()));
   const [selectedMarketing, setSelectedMarketing] = useState<string>('semua');
   const [selectedVisitType, setSelectedVisitType] = useState<string>('semua');
   const [selectedOutcome, setSelectedOutcome] = useState<string>('semua');
@@ -110,21 +107,26 @@ export default function DashboardView({
     let endFilter: Date | null = null;
 
     if (dateShortcut === 'hari_ini') {
-      startFilter = new Date(now);
-      startFilter.setHours(0, 0, 0, 0);
-      endFilter = new Date(now);
-      endFilter.setHours(23, 59, 59, 999);
+      const bounds = getWIBDayBoundsUtc(now);
+      startFilter = bounds.startUtc;
+      endFilter = bounds.endUtc;
     } else if (dateShortcut === '7_hari') {
-      startFilter = new Date(now);
-      startFilter.setDate(now.getDate() - 7);
-      startFilter.setHours(0, 0, 0, 0);
-      endFilter = new Date(now);
+      const boundsNow = getWIBDayBoundsUtc(now);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const boundsStart = getWIBDayBoundsUtc(sevenDaysAgo);
+      startFilter = boundsStart.startUtc;
+      endFilter = boundsNow.endUtc;
     } else if (dateShortcut === 'bulan_ini') {
-      startFilter = new Date(now.getFullYear(), now.getMonth(), 1);
-      endFilter = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      const { year, month } = getWIBDateParts(now);
+      startFilter = new Date(`${year}-${month}-01T00:00:00.000+07:00`);
+      const nextMonth = parseInt(month, 10) === 12 ? 1 : parseInt(month, 10) + 1;
+      const nextYear = parseInt(month, 10) === 12 ? parseInt(year, 10) + 1 : parseInt(year, 10);
+      const nextMonthStr = String(nextMonth).padStart(2, '0');
+      endFilter = new Date(new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000+07:00`).getTime() - 1);
     } else if (dateShortcut === 'tanggal' && customDate) {
-      startFilter = new Date(customDate + 'T00:00:00+07:00');
-      endFilter = new Date(customDate + 'T23:59:59+07:00');
+      const bounds = getWIBDayBoundsUtc(customDate);
+      startFilter = bounds.startUtc;
+      endFilter = bounds.endUtc;
     }
 
     return visitsList.filter((v) => {
@@ -154,6 +156,7 @@ export default function DashboardView({
   }, [
     visitsList,
     dateShortcut,
+    customDate,
     selectedMarketing,
     selectedVisitType,
     selectedOutcome,
@@ -331,20 +334,23 @@ export default function DashboardView({
     let jenis = 'bulanan';
 
     if (dateShortcut === 'hari_ini') {
-      dari = now.toISOString().substring(0, 10);
-      sampai = now.toISOString().substring(0, 10);
+      dari = getWIBDateString(now);
+      sampai = getWIBDateString(now);
       jenis = 'harian';
     } else if (dateShortcut === '7_hari') {
-      const past7 = new Date(now);
-      past7.setDate(now.getDate() - 7);
-      dari = past7.toISOString().substring(0, 10);
-      sampai = now.toISOString().substring(0, 10);
+      const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      dari = getWIBDateString(past7);
+      sampai = getWIBDateString(now);
       jenis = 'mingguan';
+    } else if (dateShortcut === 'tanggal' && customDate) {
+      dari = customDate;
+      sampai = customDate;
+      jenis = 'harian';
     } else {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      dari = firstDay.toISOString().substring(0, 10);
-      sampai = lastDay.toISOString().substring(0, 10);
+      const { year, month } = getWIBDateParts(now);
+      dari = `${year}-${month}-01`;
+      const lastDayNum = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+      sampai = `${year}-${month}-${String(lastDayNum).padStart(2, '0')}`;
       jenis = 'bulanan';
     }
 

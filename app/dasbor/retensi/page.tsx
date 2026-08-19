@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import DasborNav from '@/components/dasbor/dasbor-nav';
 import RetensiView from './retensi-view';
+import { getSetting, SETTING_KEYS } from '@/lib/settings';
 import type { Profile } from '@/lib/types/database';
 
 export default async function RetensiPage() {
@@ -25,14 +26,12 @@ export default async function RetensiPage() {
     redirect('/dasbor');
   }
 
-  // Ambil Pengaturan Retensi Hari
-  const { data: settingRaw } = (await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'retensi_foto_hari')
-    .maybeSingle()) as { data: { value: unknown } | null };
-
-  const retentionDays = Number(settingRaw?.value) || 180;
+  // Ambil Pengaturan Retensi Hari via modul settings terpusat
+  const retentionDays = await getSetting<number>(
+    supabase,
+    SETTING_KEYS.RETENSI_FOTO_HARI,
+    730
+  );
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 

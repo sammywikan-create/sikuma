@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { getSetting, SETTING_KEYS } from '@/lib/settings';
 import type { Profile, VisitPhoto, Visit } from '@/lib/types/database';
 
 export async function cleanExpiredPhotosAction() {
@@ -33,14 +34,12 @@ export async function cleanExpiredPhotosAction() {
     { auth: { persistSession: false } }
   );
 
-  // 2. Ambil Setting Retensi Hari
-  const { data: settingRaw } = (await adminClient
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'retensi_foto_hari')
-    .maybeSingle()) as { data: { value: unknown } | null };
-
-  const retentionDays = Number(settingRaw?.value) || 180;
+  // 2. Ambil Setting Retensi Hari via modul settings terpusat
+  const retentionDays = await getSetting<number>(
+    adminClient,
+    SETTING_KEYS.RETENSI_FOTO_HARI,
+    730
+  );
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 

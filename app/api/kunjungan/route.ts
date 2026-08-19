@@ -4,7 +4,9 @@ import { calculateHaversineDistanceM, calculateSpeedKmH } from '@/lib/utils/geo'
 import { createSafeSlug } from '@/lib/utils/slug';
 import { checkRateLimit } from '@/lib/security/rate-limit';
 import { writeAuditLog } from '@/lib/audit/log';
-import type { VisitType, ProductType, OutcomeType, Profile, Visit, AppSetting, VisitPhoto } from '@/lib/types/database';
+import { getWIBDateParts, getWIBDayBoundsUtc, isSameWIBDay } from '@/lib/utils/time';
+import { getSetting, SETTING_KEYS } from '@/lib/settings';
+import type { VisitType, ProductType, OutcomeType, Profile, Visit } from '@/lib/types/database';
 
 const VALID_VISIT_TYPES: VisitType[] = [
   'prospek_baru',
@@ -184,34 +186,26 @@ export async function POST(request: Request) {
     const receivedAt = new Date();
     const capturedDate = new Date(body.captured_at || receivedAt.toISOString());
 
-    // Ambil jam batas dari app_settings (default "21:00")
-    const { data: cutoffSetting } = (await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'jam_batas_unggah')
-      .maybeSingle()) as { data: AppSetting | null };
-
-    const cutoffTimeStr = (cutoffSetting?.value as string) || '21:00';
+    // Ambil jam batas dari modul settings terpusat (default "21:00")
+    const cutoffTimeStr = await getSetting<string>(
+      supabase,
+      SETTING_KEYS.JAM_BATAS_UNGGAH,
+      '21:00'
+    );
     const [cutoffHour, cutoffMinute] = cutoffTimeStr.replace(/"/g, '').split(':').map(Number);
 
-    // Hitung waktu batas dalam WIB via Intl (DILARANG aritmetika UTC+7 manual)
-    const wibTimeFmt = new Intl.DateTimeFormat('id-ID', {
-      timeZone: 'Asia/Jakarta',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    const receivedWIBParts = wibTimeFmt.formatToParts(receivedAt);
-    const receivedWIBHours = Number(receivedWIBParts.find((p) => p.type === 'hour')?.value ?? '0');
-    const receivedWIBMinutes = Number(receivedWIBParts.find((p) => p.type === 'minute')?.value ?? '0');
+    // Hitung jam dan menit penerimaan di zona WIB
+    const { hour: recHourStr, minute: recMinStr } = getWIBDateParts(receivedAt);
+    const receivedWIBHours = Number(recHourStr);
+    const receivedWIBMinutes = Number(recMinStr);
 
-    const isDifferentDay =
-      receivedAt.getTime() - capturedDate.getTime() > 24 * 60 * 60 * 1000;
-
-    const isLate =
-      isDifferentDay ||
+    // Terlambat jika: beda hari kalender WIB ATAU melewati jam batas pada hari yang sama
+    const isDifferentDay = !isSameWIBDay(capturedDate, receivedAt);
+    const isAfterCutoff =
       receivedWIBHours > cutoffHour ||
       (receivedWIBHours === cutoffHour && receivedWIBMinutes > (cutoffMinute || 0));
+
+    const isLate = isDifferentDay || isAfterCutoff;
 
     // 5. Deteksi Anomali Server-Side
     const anomalyFlags: string[] = [];
@@ -231,14 +225,14 @@ export async function POST(request: Request) {
     }
 
     // Anomali 3 & 4: Kecepatan Tidak Wajar & Lokasi Kembar
-    const startOfDay = new Date(capturedDate);
-    startOfDay.setUTCHours(0, 0, 0, 0);
+    // Gunakan batas awal hari kalender WIB (00:00 WIB)
+    const { startUtc } = getWIBDayBoundsUtc(capturedDate);
 
     const { data: recentVisits } = (await supabase
       .from('visits')
       .select('*')
       .eq('marketing_id', user.id)
-      .gte('captured_at', startOfDay.toISOString())
+      .gte('captured_at', startUtc.toISOString())
       .order('captured_at', { ascending: false })) as { data: Visit[] | null };
 
     if (recentVisits && recentVisits.length > 0) {
@@ -270,36 +264,26 @@ export async function POST(request: Request) {
       }
     }
 
-    // Anomali 5: Cek Foto Duplikat (SHA-256)
+    // Anomali 5: Cek Foto Duplikat Lintas Pengguna (SECURITY DEFINER RPC)
     const photoHashes = body.photos.map((p) => p.sha256).filter(Boolean) as string[];
     if (photoHashes.length > 0) {
-      const { data: dupPhotos } = (await supabase
-        .from('visit_photos')
-        .select('sha256')
-        .in('sha256', photoHashes)) as { data: Pick<VisitPhoto, 'sha256'>[] | null };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: dupPhotos, error: rpcError } = await (supabase as any).rpc(
+        'check_photo_hash_exists',
+        { hashes: photoHashes }
+      );
 
-      if (dupPhotos && dupPhotos.length > 0) {
+      if (rpcError) {
+        console.warn('Gagal memanggil check_photo_hash_exists RPC:', rpcError.message);
+      } else if (dupPhotos && dupPhotos.length > 0) {
         anomalyFlags.push('foto_duplikat');
       }
     }
 
     // 6. KEAMANAN: Unggah foto DULU sebelum commit baris kunjungan
-    //    Jika upload gagal, kompensasi file yang terlanjur terunggah, lalu batalkan.
-    const wibFormatter = new Intl.DateTimeFormat('id-ID', {
-      timeZone: 'Asia/Jakarta',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-    const wibParts = wibFormatter.formatToParts(capturedDate);
-    const getPart = (type: string) => wibParts.find((p) => p.type === type)?.value ?? '00';
-    const year = getPart('year');
-    const month = getPart('month');
-    const day = getPart('day');
-    const timeHHmm = `${getPart('hour')}${getPart('minute')}`;
+    //    Gunakan komponen tanggal dan jam WIB murni untuk penamaan folder & berkas
+    const { year, month, day, hour, minute } = getWIBDateParts(capturedDate);
+    const timeHHmm = `${hour}${minute}`;
     const dateFormatted = `${year}-${month}-${day}`;
 
     const marketingCode = profile.marketing_code || 'MKT00';

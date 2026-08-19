@@ -1,3 +1,5 @@
+import { getWIBDateParts } from './time';
+
 const MONTH_NAMES_ID = [
   'Januari',
   'Februari',
@@ -13,50 +15,47 @@ const MONTH_NAMES_ID = [
   'Desember',
 ];
 
-const DAY_NAMES_ID = [
-  'Minggu',
-  'Senin',
-  'Selasa',
-  'Rabu',
-  'Kamis',
-  'Jumat',
-  'Sabtu',
-];
+const dayFormatter = new Intl.DateTimeFormat('id-ID', {
+  timeZone: 'Asia/Jakarta',
+  weekday: 'long',
+});
 
 /**
- * Format waktu lengkap hari dan tanggal: Senin, 18 Agustus 2026 14:30 WIB
+ * Format waktu lengkap hari dan tanggal standar WIB: "Senin, 18 Agustus 2026 14:30 WIB"
  */
-export function formatIndonesianFullDateTime(dateInput: string | Date): string {
-  const d = new Date(dateInput);
+export function formatIndonesianFullDateTime(dateInput: string | Date | number): string {
+  const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
   if (isNaN(d.getTime())) return '-';
-  const dayName = DAY_NAMES_ID[d.getDay()];
-  const day = d.getDate();
-  const month = MONTH_NAMES_ID[d.getMonth()];
-  const year = d.getFullYear();
-  const hours = (d.getUTCHours() + 7) % 24;
-  const minutes = d.getUTCMinutes().toString().padStart(2, '0');
-  const timeStr = `${hours.toString().padStart(2, '0')}:${minutes}`;
-  return `${dayName}, ${day} ${month} ${year} ${timeStr} WIB`;
+
+  const dayName = dayFormatter.format(d);
+  const { day, month, year, hour, minute } = getWIBDateParts(d);
+  const monthIdx = parseInt(month, 10) - 1;
+  const monthName = MONTH_NAMES_ID[monthIdx] || month;
+  const dayNum = parseInt(day, 10);
+
+  return `${dayName}, ${dayNum} ${monthName} ${year} ${hour}:${minute} WIB`;
 }
 
 /**
- * Format tanggal Indonesia baku: 1 Agustus 2026
+ * Format tanggal Indonesia baku standar WIB: "1 Agustus 2026"
  */
-export function formatIndonesianDate(dateInput: string | Date): string {
-  const d = new Date(dateInput);
+export function formatIndonesianDate(dateInput: string | Date | number): string {
+  const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
   if (isNaN(d.getTime())) return '-';
-  const day = d.getDate();
-  const month = MONTH_NAMES_ID[d.getMonth()];
-  const year = d.getFullYear();
-  return `${day} ${month} ${year}`;
+
+  const { day, month, year } = getWIBDateParts(d);
+  const monthIdx = parseInt(month, 10) - 1;
+  const monthName = MONTH_NAMES_ID[monthIdx] || month;
+  const dayNum = parseInt(day, 10);
+
+  return `${dayNum} ${monthName} ${year}`;
 }
 
 /**
- * Format rentang tanggal Indonesia: 1 Agustus 2026 - 31 Agustus 2026
+ * Format rentang tanggal Indonesia: "1 Agustus 2026 – 31 Agustus 2026"
  */
 export function formatIndonesianDateRange(startStr: string, endStr: string): string {
   const start = formatIndonesianDate(startStr);
   const end = formatIndonesianDate(endStr);
   return `${start} – ${end}`;
 }
-

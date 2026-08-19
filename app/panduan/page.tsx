@@ -1,6 +1,17 @@
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { getSetting, SETTING_KEYS } from '@/lib/settings';
 
-export default function PanduanMarketingPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function PanduanMarketingPage() {
+  const supabase = await createClient();
+  const cutoffTime = await getSetting<string>(
+    supabase,
+    SETTING_KEYS.JAM_BATAS_UNGGAH,
+    '21:00'
+  );
+
   return (
     <main className="flex-1 flex flex-col p-4 bg-slate-50 min-h-screen text-slate-900 pb-12">
       {/* Header */}
@@ -84,10 +95,10 @@ export default function PanduanMarketingPage() {
             <h2 className="text-sm">Batas Jam Pengiriman Data</h2>
           </div>
           <p className="text-slate-600 leading-relaxed">
-            Kunjungan wajib disinkronkan ke server paling lambat pukul <strong className="text-slate-900 font-bold">18:00 WIB</strong> pada hari yang sama.
+            Kunjungan wajib disinkronkan ke server paling lambat pukul <strong className="text-slate-900 font-bold">{cutoffTime} WIB</strong> pada hari yang sama.
           </p>
           <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px]">
-            ⚠️ Kunjungan yang dikirim setelah jam 18:00 WIB akan otomatis ditandai flag <strong>&quot;Terlambat Kirim&quot;</strong> pada dasbor Kepala Cabang.
+            ⚠️ Kunjungan yang dikirim setelah jam {cutoffTime} WIB akan otomatis ditandai flag <strong>&quot;Terlambat Kirim&quot;</strong> pada dasbor Kepala Cabang.
           </div>
         </section>
 

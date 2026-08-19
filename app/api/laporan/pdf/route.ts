@@ -7,6 +7,8 @@ import { PassThrough } from 'stream';
 import { ReportPDFDocument, type PDFReportData } from '@/lib/pdf/report-document';
 import type { Profile, Visit, VisitPhoto } from '@/lib/types/database';
 
+import { getAllSettings } from '@/lib/settings';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     if (!userProfile || (userProfile.role !== 'kacab' && userProfile.role !== 'admin')) {
       return NextResponse.json(
-        { error: 'Hanya Kepala Cabang atau Admin yang berhak mengunduh laporan PDF.' },
+        { error: 'Hanya Kepala Cabang atau Admin yang berhak mencetak dokumen laporan PDF.' },
         { status: 403 }
       );
     }
@@ -50,13 +52,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 2. Parse Query Parameters
+    // 2. Parse Parameter Filter Query URL
     const { searchParams } = new URL(request.url);
+    const dari = searchParams.get('dari');
+    const sampai = searchParams.get('sampai');
+    const marketingFilter = searchParams.get('marketing'); // ID atau 'semua'
     const jenis = (searchParams.get('jenis') || 'bulanan') as 'harian' | 'mingguan' | 'bulanan';
     const kategori = (searchParams.get('kategori') || 'semua') as 'semua' | 'pemasaran' | 'penagihan';
-    const dari = searchParams.get('dari') || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().substring(0, 10);
-    const sampai = searchParams.get('sampai') || new Date().toISOString().substring(0, 10);
-    const marketingFilter = searchParams.get('marketing');
+
+    if (!dari || !sampai) {
+      return NextResponse.json(
+        { error: 'Parameter tanggal "dari" dan "sampai" wajib disertakan.' },
+        { status: 400 }
+      );
+    }
 
     const startDate = new Date(dari);
     startDate.setHours(0, 0, 0, 0);
@@ -64,19 +73,14 @@ export async function GET(request: NextRequest) {
     const endDate = new Date(sampai);
     endDate.setHours(23, 59, 59, 999);
 
-    // 3. Ambil Pengaturan Cabang dari app_settings
-    const { data: settingsRaw } = (await supabase
-      .from('app_settings')
-      .select('*')) as { data: { key: string; value: unknown }[] | null };
+    // 3. Ambil Pengaturan Cabang dari modul settings terpusat
+    const appSettings = await getAllSettings(supabase);
 
-    const settingsMap = new Map<string, string>();
-    settingsRaw?.forEach((s) => {
-      settingsMap.set(s.key, typeof s.value === 'string' ? s.value.replace(/"/g, '') : String(s.value));
-    });
-
-    const bankName = settingsMap.get('nama_aplikasi') || 'BANK BKK';
-    const branchName = 'KANTOR CABANG UTAMA SEMARANG';
-    const kacabName = userProfile.role === 'kacab' ? userProfile.full_name : 'Budi Santoso, S.E. (Kepala Cabang)';
+    const bankName = appSettings.nama_aplikasi;
+    const branchName = appSettings.nama_cabang;
+    const kacabName = userProfile.role === 'kacab'
+      ? `${userProfile.full_name} (Kepala Cabang)`
+      : `${appSettings.nama_kepala_cabang} (Kepala Cabang)`;
 
     // 4. Query Data Marketing
     let marketingQuery = supabase.from('profiles').select('*').eq('role', 'marketing');

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { formatWIB } from '@/lib/utils/time';
+import { formatWIB, getWIBDateString, isSameWIBDay } from '@/lib/utils/time';
 import { formatRupiah } from '@/lib/utils/format';
 import QueuedVisitsCard from '@/components/offline/queued-visits-card';
 import type { Profile, Visit, VisitPhoto } from '@/lib/types/database';
@@ -33,15 +33,11 @@ export default function PenagihanView({
 }: PenagihanViewProps) {
   const [visits, setVisits] = useState<VisitWithPhotos[]>(initialVisits);
 
-  useEffect(() => {
-    setVisits(initialVisits);
-  }, [initialVisits]);
-
-  // Realtime subscription untuk petugas penagihan ini
+  // Realtime subscription untuk penagihan
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel(`penagihan_visits_${profile.id}`)
+      .channel(`realtime_penagihan_${profile.id}`)
       .on(
         'postgres_changes',
         {
@@ -50,28 +46,21 @@ export default function PenagihanView({
           table: 'visits',
           filter: `marketing_id=eq.${profile.id}`,
         },
-        async (payload) => {
+        (payload) => {
           if (payload.eventType === 'INSERT') {
-            const { data: newV } = await supabase
-              .from('visits')
-              .select('*, visit_photos(*)')
-              .eq('id', (payload.new as Visit).id)
-              .maybeSingle();
-
-            if (newV && (newV as Visit).visit_type === 'penagihan') {
-              setVisits((prev) => [
-                newV as unknown as VisitWithPhotos,
-                ...prev.filter((v) => v.id !== (newV as Visit).id),
-              ]);
-            }
+            const newV = payload.new as Visit;
+            setVisits((prev) => [
+              {
+                ...newV,
+                visit_photos: [],
+              } as unknown as VisitWithPhotos,
+              ...prev,
+            ]);
           } else if (payload.eventType === 'UPDATE') {
             const updated = payload.new as Visit;
             setVisits((prev) =>
               prev.map((v) => (v.id === updated.id ? { ...v, ...updated } : v))
             );
-          } else if (payload.eventType === 'DELETE') {
-            const deletedId = (payload.old as { id: string }).id;
-            setVisits((prev) => prev.filter((v) => v.id !== deletedId));
           }
         }
       )
@@ -84,34 +73,19 @@ export default function PenagihanView({
 
   // Hitung jumlah penagihan hari ini (WIB)
   const now = new Date();
-  const todayWIB = new Date(now.getTime() + 7 * 60 * 60 * 1000).toISOString().substring(0, 10);
-  const todayVisits = visits.filter((v) => {
-    const vDateWIB = new Date(new Date(v.captured_at).getTime() + 7 * 60 * 60 * 1000)
-      .toISOString()
-      .substring(0, 10);
-    return vDateWIB === todayWIB;
-  });
+  const todayVisits = visits.filter((v) => isSameWIBDay(v.captured_at, now));
 
   const todayCount = todayVisits.length;
   const progressPercent = Math.min(Math.round((todayCount / dailyTarget) * 100), 100);
 
   // Filter riwayat: default Hari Ini, bisa pilih tanggal spesifik
   const [dateFilter, setDateFilter] = useState<'hari_ini' | '7_hari' | 'tanggal'>('hari_ini');
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-    return wib.toISOString().substring(0, 10);
-  });
+  const [selectedDate, setSelectedDate] = useState(() => getWIBDateString(new Date()));
 
   const displayedVisits = (() => {
     if (dateFilter === 'hari_ini') return todayVisits;
     if (dateFilter === '7_hari') return visits;
-    return visits.filter((v) => {
-      const vDateWIB = new Date(new Date(v.captured_at).getTime() + 7 * 60 * 60 * 1000)
-        .toISOString()
-        .substring(0, 10);
-      return vDateWIB === selectedDate;
-    });
+    return visits.filter((v) => getWIBDateString(v.captured_at) === selectedDate);
   })();
 
   const filterLabel = dateFilter === 'hari_ini' ? 'Hari Ini' : dateFilter === '7_hari' ? '7 Hari Terakhir' : selectedDate;

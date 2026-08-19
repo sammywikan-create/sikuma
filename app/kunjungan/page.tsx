@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import KunjunganView, { type VisitWithPhotos } from './kunjungan-view';
+import { getSetting, SETTING_KEYS } from '@/lib/settings';
 import type { Profile } from '@/lib/types/database';
 
 // Jangan cache — selalu ambil data terbaru saat navigasi
@@ -28,14 +29,12 @@ export default async function KunjunganPage() {
     redirect('/dasbor');
   }
 
-  // 1. Ambil target harian dari app_settings (default 4)
-  const { data: targetSetting } = (await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'target_kunjungan_harian')
-    .maybeSingle()) as { data: { value: unknown } | null };
-
-  const dailyTarget = Number(targetSetting?.value) || 4;
+  // 1. Ambil target harian dari modul settings terpusat (default 4)
+  const dailyTarget = await getSetting<number>(
+    supabase,
+    SETTING_KEYS.TARGET_KUNJUNGAN_HARIAN,
+    4
+  );
 
   // 2. Ambil riwayat kunjungan 7 hari terakhir untuk marketing ini
   const sevenDaysAgo = new Date();

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import PenagihanView, { type VisitWithPhotos } from './penagihan-view';
+import { getSetting, SETTING_KEYS } from '@/lib/settings';
 import type { Profile } from '@/lib/types/database';
 
 // Jangan cache — selalu ambil data terbaru saat navigasi
@@ -28,14 +29,12 @@ export default async function PenagihanPage() {
     redirect('/dasbor');
   }
 
-  // 1. Ambil target penagihan harian (default 5)
-  const { data: targetSetting } = (await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'target_penagihan_harian')
-    .maybeSingle()) as { data: { value: unknown } | null };
-
-  const dailyTarget = Number(targetSetting?.value) || 5;
+  // 1. Ambil target penagihan harian dari modul settings terpusat (default 5)
+  const dailyTarget = await getSetting<number>(
+    supabase,
+    SETTING_KEYS.TARGET_PENAGIHAN_HARIAN,
+    5
+  );
 
   // 2. Ambil riwayat penagihan 7 hari terakhir untuk petugas ini
   const sevenDaysAgo = new Date();
