@@ -62,5 +62,16 @@ export async function changePasswordAction(
     return { error: `Gagal mengubah password: ${updateError.message}` };
   }
 
+  // Catat ke audit_log
+  const { writeAuditLog } = await import('@/lib/audit/log');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await writeAuditLog(supabase as any, {
+    actorId: user.id,
+    action: 'password_changed',
+    entity: 'profiles',
+    entityId: user.id,
+    payload: { email: user.email },
+  });
+
   return { success: true };
 }

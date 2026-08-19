@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createMarketingUserAction, toggleUserStatusAction } from '../actions';
+import { createMarketingUserAction, toggleUserStatusAction, resetUserPasswordAction } from '../actions';
 import type { Profile, UserRole } from '@/lib/types/database';
 
 interface PenggunaViewProps {
@@ -32,6 +32,21 @@ export default function PenggunaView({ initialProfiles }: PenggunaViewProps) {
     const pwd = crypto.randomUUID().slice(0, 16) + '!A';
     setNewPassword(pwd);
     setShowPassword(true);
+  };
+
+  const handleResetPassword = async (profile: Profile) => {
+    const confirmMsg = `Reset kata sandi untuk "${profile.full_name}"? Kata sandi baru yang aman akan dibuatkan otomatis.`;
+    if (!confirm(confirmMsg)) return;
+
+    const res = await resetUserPasswordAction(profile.id);
+    if (res.error) {
+      alert(`Gagal mereset kata sandi: ${res.error}`);
+    } else if (res.newPassword) {
+      setCreatedUserName(profile.full_name);
+      setCreatedUserPassword(res.newPassword);
+      setShowPasswordModal(true);
+      setCopiedPassword(false);
+    }
   };
 
   const handleToggleActive = async (profile: Profile) => {
@@ -160,22 +175,34 @@ export default function PenggunaView({ initialProfiles }: PenggunaViewProps) {
               </p>
             </div>
 
-            {p.role !== 'kacab' && p.role !== 'admin' ? (
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={() => handleToggleActive(p)}
-                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                  p.is_active
-                    ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
-                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-                }`}
+                type="button"
+                onClick={() => handleResetPassword(p)}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg transition cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center gap-1"
+                title="Reset kata sandi pengguna ini"
               >
-                {p.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                <span>🔑</span> Reset Sandi
               </button>
-            ) : (
-              <span className="text-[11px] font-semibold text-slate-400 px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200/80">
-                🔒 Akun Utama
-              </span>
-            )}
+
+              {p.role !== 'kacab' && p.role !== 'admin' ? (
+                <button
+                  type="button"
+                  onClick={() => handleToggleActive(p)}
+                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                    p.is_active
+                      ? 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                  }`}
+                >
+                  {p.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                </button>
+              ) : (
+                <span className="text-[11px] font-semibold text-slate-400 px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200/80">
+                  🔒 Akun Utama
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>

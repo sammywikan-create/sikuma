@@ -144,18 +144,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validasi format dan ukuran setiap foto
+    // Validasi format dan ukuran setiap foto (baik melalui direct storage_path maupun dataUrl)
     for (const photo of body.photos) {
-      if (!photo.dataUrl || (!photo.dataUrl.startsWith('data:image/jpeg') && !photo.dataUrl.startsWith('data:image/jpg'))) {
+      if (photo.storage_path) {
+        const path = String(photo.storage_path).toLowerCase();
+        if (!path.endsWith('.jpg') && !path.endsWith('.jpeg')) {
+          return NextResponse.json(
+            { error: 'Format berkas foto tidak valid. Hanya foto JPEG/JPG dari kamera yang diizinkan.' },
+            { status: 400 }
+          );
+        }
+        if (photo.bytes && photo.bytes > 14 * 1024 * 1024) {
+          return NextResponse.json(
+            { error: 'Ukuran foto melebihi batas maksimal (10 MB).' },
+            { status: 400 }
+          );
+        }
+      } else if (photo.dataUrl) {
+        if (!photo.dataUrl.startsWith('data:image/jpeg') && !photo.dataUrl.startsWith('data:image/jpg')) {
+          return NextResponse.json(
+            { error: 'Format berkas foto tidak valid. Hanya foto JPEG/JPG dari kamera yang diizinkan.' },
+            { status: 400 }
+          );
+        }
+        // Batasi ukuran base64 payload maksimal 10MB
+        if (photo.dataUrl.length > 14 * 1024 * 1024) {
+          return NextResponse.json(
+            { error: 'Ukuran foto melebihi batas maksimal (10 MB).' },
+            { status: 400 }
+          );
+        }
+      } else {
         return NextResponse.json(
-          { error: 'Format berkas foto tidak valid. Hanya foto JPEG/JPG dari kamera yang diizinkan.' },
-          { status: 400 }
-        );
-      }
-      // Batasi ukuran base64 payload maksimal 10MB
-      if (photo.dataUrl.length > 14 * 1024 * 1024) {
-        return NextResponse.json(
-          { error: 'Ukuran foto melebihi batas maksimal (10 MB).' },
+          { error: 'Berkas foto tidak memiliki referensi storage_path atau dataUrl yang valid.' },
           { status: 400 }
         );
       }

@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
       ? `${userProfile.full_name} (Kepala Cabang)`
       : `${appSettings.nama_kepala_cabang} (Kepala Cabang)`;
 
-    // 4. Query Data Marketing
-    let marketingQuery = supabase.from('profiles').select('*').eq('role', 'marketing');
+    // 4. Query Data Marketing / Petugas Lapangan
+    let marketingQuery = supabase.from('profiles').select('*').in('role', ['marketing', 'penagihan']);
     if (marketingFilter && marketingFilter !== 'semua') {
       const ids = marketingFilter.split(',');
       marketingQuery = marketingQuery.in('id', ids);

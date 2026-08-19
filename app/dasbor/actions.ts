@@ -273,6 +273,74 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
   }
 }
 
+export async function resetUserPasswordAction(userId: string, newPassword?: string) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: 'Sesi Anda telah berakhir.' };
+    }
+
+    const { data: profile } = (await supabase
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', user.id)
+      .single()) as { data: Pick<Profile, 'role' | 'full_name'> | null };
+
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'kacab')) {
+      return { error: 'Hanya Kepala Cabang atau Admin yang berhak mereset kata sandi pengguna.' };
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return {
+        error: 'Kunci SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi di server.',
+      };
+    }
+
+    const adminClient = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
+
+    const password = newPassword?.trim() || crypto.randomUUID().slice(0, 16) + '!A';
+
+    const { error: updateErr } = await adminClient.auth.admin.updateUserById(userId, {
+      password: password,
+    });
+
+    if (updateErr) {
+      return { error: `Gagal mereset kata sandi: ${updateErr.message}` };
+    }
+
+    // Catat ke audit_log
+    const { error: auditErr } = await adminClient.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'user_password_reset',
+      entity: 'profiles',
+      entity_id: userId,
+      payload: {
+        reset_by_name: profile.full_name,
+        reset_by_role: profile.role,
+      },
+    });
+
+    if (auditErr) {
+      console.error(`[AUDIT] Gagal menulis log user_password_reset: ${auditErr.message}`);
+    }
+
+    return { success: true, newPassword: password };
+  } catch (err: unknown) {
+    console.error('Error in resetUserPasswordAction:', err);
+    return { error: `Terjadi galat server: ${(err as Error).message}` };
+  }
+}
+
 /**
  * Mengambil 1 detail kunjungan lengkap beserta signed URL fotonya on-demand saat modal dibuka
  */

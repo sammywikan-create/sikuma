@@ -123,7 +123,6 @@ export async function updateSystemSettingsAction(newSettings: AppSettings) {
           .upsert({
             key: update.key,
             value: typeof update.value === 'number' ? update.value : JSON.stringify(update.value),
-            updated_at: new Date().toISOString(),
           });
 
         if (upsertErr) {
