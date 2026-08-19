@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { formatWIB, getWIBDateString, isSameWIBDay } from '@/lib/utils/time';
 import { formatRupiah } from '@/lib/utils/format';
+import { loadMoreMarketingVisitsAction } from '@/app/kunjungan/actions';
 import QueuedVisitsCard from '@/components/offline/queued-visits-card';
 import type { Profile, Visit, VisitPhoto } from '@/lib/types/database';
 
@@ -22,16 +23,22 @@ const KOLEKTIBILITAS_LABEL: Record<string, string> = {
 
 interface PenagihanViewProps {
   initialVisits: VisitWithPhotos[];
+  initialHasMore?: boolean;
+  todayVisitsCount?: number;
   profile: Profile;
   dailyTarget: number;
 }
 
 export default function PenagihanView({
   initialVisits,
+  initialHasMore = false,
+  todayVisitsCount: _todayVisitsCount,
   profile,
   dailyTarget,
 }: PenagihanViewProps) {
   const [visits, setVisits] = useState<VisitWithPhotos[]>(initialVisits);
+  const [hasMore, setHasMore] = useState<boolean>(initialHasMore);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
 
   // Realtime subscription untuk penagihan
   useEffect(() => {
@@ -336,6 +343,42 @@ export default function PenagihanView({
                 </div>
               </div>
             ))}
+
+            {hasMore && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  disabled={isLoadingMore}
+                  onClick={async () => {
+                    setIsLoadingMore(true);
+                    try {
+                      const res = await loadMoreMarketingVisitsAction(visits.length, 20, undefined, true);
+                      if (res.data && res.data.length > 0) {
+                        setVisits((prev) => [
+                          ...prev,
+                          ...(res.data as unknown as VisitWithPhotos[]),
+                        ]);
+                      }
+                      setHasMore(res.hasMore || false);
+                    } catch (err) {
+                      console.error('Gagal memuat penagihan lainnya:', err);
+                    } finally {
+                      setIsLoadingMore(false);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-white border border-slate-200 hover:bg-slate-50 active:bg-slate-100 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-bkk-600 border-t-transparent rounded-full animate-spin"></span>
+                      Memuat data tambahan...
+                    </>
+                  ) : (
+                    '⬇ Muat Lebih Banyak Penagihan'
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

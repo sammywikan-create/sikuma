@@ -430,8 +430,49 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
         return;
       }
 
-      // Jika online, coba kirim ke API server
+      // Jika online, lakukan unggah langsung ke Supabase Storage via signed URL
       try {
+        const uploadedPhotoMetadata = [];
+
+        for (const p of photos) {
+          // 1. Minta signed upload URL resmi dari server
+          const signRes = await fetch('/api/kunjungan/unggah-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customer_name: customerName.trim(),
+              captured_at: p.captured_at,
+            }),
+          });
+
+          const signData = await signRes.json();
+          if (!signRes.ok || !signData.signed_url || !signData.storage_path) {
+            throw new Error(signData.error || 'Gagal memperoleh URL unggah dari server.');
+          }
+
+          // 2. Unggah Blob JPEG langsung ke Storage via PUT (bukan base64 payload)
+          const blob = await fetch(p.dataUrl).then((r) => r.blob());
+          const uploadRes = await fetch(signData.signed_url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'image/jpeg' },
+            body: blob,
+          });
+
+          if (!uploadRes.ok) {
+            throw new Error(`Gagal mengunggah berkas foto ke storage (${uploadRes.status}).`);
+          }
+
+          uploadedPhotoMetadata.push({
+            storage_path: signData.storage_path,
+            bytes: p.bytes || blob.size,
+            width: p.width,
+            height: p.height,
+            sha256: p.sha256,
+            sort_order: p.sort_order,
+          });
+        }
+
+        // 3. Kirim metadata ringan tanpa base64 ke /api/kunjungan
         const payload = {
           client_uuid: clientUuid,
           customer_name: customerName.trim(),
@@ -447,14 +488,7 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
           lng: primaryPhoto.lng,
           accuracy_m: primaryPhoto.accuracy_m,
           address: primaryPhoto.address,
-          photos: photos.map((p) => ({
-            dataUrl: p.dataUrl,
-            bytes: p.bytes,
-            width: p.width,
-            height: p.height,
-            sha256: p.sha256,
-            sort_order: p.sort_order,
-          })),
+          photos: uploadedPhotoMetadata,
         };
 
         const res = await fetch('/api/kunjungan', {

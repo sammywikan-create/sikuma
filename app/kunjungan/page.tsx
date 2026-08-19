@@ -2,9 +2,9 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import KunjunganView, { type VisitWithPhotos } from './kunjungan-view';
 import { getSetting, SETTING_KEYS } from '@/lib/settings';
+import { getWIBDayBoundsUtc } from '@/lib/utils/time';
 import type { Profile } from '@/lib/types/database';
 
-// Jangan cache — selalu ambil data terbaru saat navigasi
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -29,34 +29,66 @@ export default async function KunjunganPage() {
     redirect('/dasbor');
   }
 
-  // 1. Ambil target harian dari modul settings terpusat (default 4)
+  // 1. Ambil target harian dari modul settings terpusat
   const dailyTarget = await getSetting<number>(
     supabase,
     SETTING_KEYS.TARGET_KUNJUNGAN_HARIAN,
     4
   );
 
-  // 2. Ambil riwayat kunjungan 7 hari terakhir untuk marketing ini
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
-
-  const { data: visitsRaw } = await supabase
+  // 2. Ambil 20 riwayat kunjungan terbaru dengan kolom eksplisit dan photo count
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: visitsRaw, count } = await (supabase as any)
     .from('visits')
     .select(`
-      *,
-      visit_photos (*)
-    `)
+      id,
+      client_uuid,
+      customer_name,
+      visit_type,
+      product,
+      outcome,
+      potential_value,
+      baki_debet,
+      kolektibilitas,
+      notes,
+      captured_at,
+      lat,
+      lng,
+      accuracy_m,
+      address,
+      is_late,
+      anomaly_flags,
+      verification_status,
+      verifier_note,
+      visit_photos (count)
+    `, { count: 'exact' })
     .eq('marketing_id', user.id)
     .neq('visit_type', 'penagihan')
-    .gte('captured_at', sevenDaysAgo.toISOString())
-    .order('captured_at', { ascending: false });
+    .order('captured_at', { ascending: false })
+    .range(0, 19);
 
   const visits = (visitsRaw as unknown as VisitWithPhotos[]) || [];
+  const totalCount = count || 0;
+  const initialHasMore = totalCount > 20;
+
+  // 3. Hitung jumlah kunjungan hari ini secara akurat via batas WIB
+  const { startUtc, endUtc } = getWIBDayBoundsUtc(new Date());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: todayCountRaw } = await (supabase as any)
+    .from('visits')
+    .select('*', { count: 'exact', head: true })
+    .eq('marketing_id', user.id)
+    .neq('visit_type', 'penagihan')
+    .gte('captured_at', startUtc.toISOString())
+    .lte('captured_at', endUtc.toISOString());
+
+  const todayVisitsCount = todayCountRaw || 0;
 
   return (
     <KunjunganView
       initialVisits={visits}
+      initialHasMore={initialHasMore}
+      todayVisitsCount={todayVisitsCount}
       profile={profile}
       userEmail={user.email || ''}
       dailyTarget={dailyTarget}

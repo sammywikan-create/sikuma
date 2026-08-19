@@ -272,3 +272,86 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
     return { error: `Terjadi galat server: ${(err as Error).message}` };
   }
 }
+
+/**
+ * Mengambil 1 detail kunjungan lengkap beserta signed URL fotonya on-demand saat modal dibuka
+ */
+export async function getVisitDetailAction(visitId: string) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: 'Sesi Anda telah berakhir.' };
+    }
+
+    const { data: profile } = (await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()) as { data: Pick<Profile, 'role'> | null };
+
+    if (!profile) {
+      return { error: 'Profil tidak ditemukan.' };
+    }
+
+    const adminClient = createSupabaseAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const client = profile.role === 'kacab' || profile.role === 'admin' ? adminClient : supabase;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: visit, error: visitErr } = await (client as any)
+      .from('visits')
+      .select(`
+        *,
+        marketing:profiles!marketing_id (full_name, marketing_code),
+        visit_photos (*)
+      `)
+      .eq('id', visitId)
+      .maybeSingle();
+
+    if (visitErr || !visit) {
+      return { error: 'Data kunjungan tidak ditemukan.' };
+    }
+
+    if (profile.role === 'marketing' || profile.role === 'penagihan') {
+      if (visit.marketing_id !== user.id) {
+        return { error: 'Akses ditolak.' };
+      }
+    }
+
+    // Buat signed URL (berlaku 1 jam) untuk setiap foto secara paralel
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const photosWithSignedUrls = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (visit.visit_photos || []).map(async (photo: any) => {
+        if (!photo.storage_path) return { ...photo, signedUrl: null };
+        const { data: signed } = await adminClient.storage
+          .from('kunjungan')
+          .createSignedUrl(photo.storage_path, 3600);
+        return {
+          ...photo,
+          signedUrl: signed?.signedUrl || null,
+        };
+      })
+    );
+
+    return {
+      data: {
+        ...visit,
+        visit_photos: photosWithSignedUrls,
+      },
+    };
+  } catch (err: unknown) {
+    console.error('Error in getVisitDetailAction:', err);
+    return { error: `Gagal memuat detail foto: ${(err as Error).message}` };
+  }
+}
+

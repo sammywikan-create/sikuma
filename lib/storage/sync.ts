@@ -15,6 +15,53 @@ export async function syncSingleVisit(
   visit: QueuedVisit
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const uploadedPhotosMetadata = [];
+
+    for (const photo of visit.photos) {
+      // 1. Minta signed upload URL dari server
+      const signRes = await fetch('/api/kunjungan/unggah-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: visit.customer_name,
+          captured_at: photo.captured_at || visit.captured_at,
+        }),
+      });
+
+      const signData = await signRes.json();
+      if (!signRes.ok || !signData.signed_url || !signData.storage_path) {
+        return {
+          success: false,
+          error: signData.error || 'Gagal memperoleh signed upload URL saat sinkronisasi.',
+        };
+      }
+
+      // 2. Unggah Blob JPEG langsung ke Storage
+      const blob = await fetch(photo.dataUrl).then((r) => r.blob());
+      const uploadRes = await fetch(signData.signed_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: blob,
+      });
+
+      if (!uploadRes.ok) {
+        return {
+          success: false,
+          error: `Gagal mengunggah foto ke storage (${uploadRes.status}).`,
+        };
+      }
+
+      uploadedPhotosMetadata.push({
+        storage_path: signData.storage_path,
+        bytes: photo.bytes || blob.size,
+        width: photo.width,
+        height: photo.height,
+        sha256: photo.sha256,
+        sort_order: photo.sort_order,
+      });
+    }
+
+    // 3. Kirim metadata kunjungan
     const payload = {
       client_uuid: visit.client_uuid,
       customer_name: visit.customer_name,
@@ -30,14 +77,7 @@ export async function syncSingleVisit(
       lng: visit.lng,
       accuracy_m: visit.accuracy_m,
       address: visit.address,
-      photos: visit.photos.map((p) => ({
-        dataUrl: p.dataUrl,
-        bytes: p.bytes,
-        width: p.width,
-        height: p.height,
-        sha256: p.sha256,
-        sort_order: p.sort_order,
-      })),
+      photos: uploadedPhotosMetadata,
     };
 
     const res = await fetch('/api/kunjungan', {
@@ -58,7 +98,7 @@ export async function syncSingleVisit(
   } catch (err: unknown) {
     return {
       success: false,
-      error: (err as Error).message || 'Gagal terhubung ke server.',
+      error: (err as Error).message || 'Gagal terhubung ke server saat sinkronisasi.',
     };
   }
 }

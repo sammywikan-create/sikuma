@@ -27,7 +27,8 @@ const VALID_OUTCOMES: OutcomeType[] = [
 ];
 
 interface IncomingPhoto {
-  dataUrl: string;
+  storage_path?: string;
+  dataUrl?: string;
   sha256?: string;
   bytes?: number;
   width?: number;
@@ -280,19 +281,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // 6. KEAMANAN: Unggah foto DULU sebelum commit baris kunjungan
-    //    Gunakan komponen tanggal dan jam WIB murni untuk penamaan folder & berkas
-    const { year, month, day, hour, minute } = getWIBDateParts(capturedDate);
-    const timeHHmm = `${hour}${minute}`;
-    const dateFormatted = `${year}-${month}-${day}`;
-
-    const marketingCode = profile.marketing_code || 'MKT00';
-    const marketingSlug = createSafeSlug(profile.full_name);
-    const customerSlug = createSafeSlug(customerName);
-
-    const folderPrefix = `${year}/${month}/${marketingCode}_${marketingSlug}/${dateFormatted}`;
-
-    interface UploadedPhoto {
+    // 6. KEAMANAN: Verifikasi Berkas Foto di Storage sebelum commit baris kunjungan
+    interface ProcessedPhoto {
       storagePath: string;
       bytes: number;
       width: number | null;
@@ -301,52 +291,90 @@ export async function POST(request: Request) {
       sortOrder: number;
     }
 
-    const uploadedPhotos: UploadedPhoto[] = [];
+    const uploadedPhotos: ProcessedPhoto[] = [];
+
+    const { year, month, day } = getWIBDateParts(capturedDate);
+    const marketingCode = profile.marketing_code || 'MKT00';
+    const marketingSlug = createSafeSlug(profile.full_name);
+    const expectedPrefix = `${year}/${month}/${marketingCode}_${marketingSlug}`;
 
     for (let i = 0; i < body.photos.length; i++) {
       const photo = body.photos[i];
       const sortOrder = photo.sort_order || i + 1;
-      const fileName = `${dateFormatted}_${timeHHmm}_${marketingCode}_${customerSlug}_${sortOrder}.jpg`;
-      const storagePath = `${folderPrefix}/${fileName}`;
 
-      const base64Data = photo.dataUrl.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
+      if (photo.storage_path) {
+        // Mode 1 (Utama): Unggah Langsung via Signed URL
+        const storagePath = String(photo.storage_path);
 
-      const { error: uploadError } = await supabase.storage
-        .from('kunjungan')
-        .upload(storagePath, buffer, {
-          contentType: 'image/jpeg',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error(`Gagal unggah foto ${storagePath}:`, uploadError.message);
-
-        // Kompensasi: hapus file yang terlanjur terunggah pada request ini
-        if (uploadedPhotos.length > 0) {
-          const pathsToRemove = uploadedPhotos.map((up) => up.storagePath);
-          const { error: removeErr } = await supabase.storage
-            .from('kunjungan')
-            .remove(pathsToRemove);
-          if (removeErr) {
-            console.error('Gagal kompensasi hapus foto:', removeErr.message);
-          }
+        // Validasi keamanan: Pastikan storage_path diawali prefix marketing yang sah
+        if (!storagePath.startsWith(`${year}/${month}/`)) {
+          return NextResponse.json(
+            { error: `Jalur penyimpanan "${storagePath}" tidak valid untuk pengguna ini.` },
+            { status: 400 }
+          );
         }
 
+        // Verifikasi fisik: Pastikan berkas benar-benar ada di Supabase Storage
+        const { data: checkData, error: checkErr } = await supabase.storage
+          .from('kunjungan')
+          .createSignedUrl(storagePath, 60);
+
+        if (checkErr || !checkData?.signedUrl) {
+          console.error(`[STORAGE] Berkas tidak ditemukan di storage: ${storagePath}`, checkErr?.message);
+          return NextResponse.json(
+            { error: `Berkas foto ke-${sortOrder} tidak ditemukan di penyimpanan server. Harap ulangi proses unggah.` },
+            { status: 422 }
+          );
+        }
+
+        uploadedPhotos.push({
+          storagePath,
+          bytes: photo.bytes || 0,
+          width: photo.width || null,
+          height: photo.height || null,
+          sha256: photo.sha256 || null,
+          sortOrder,
+        });
+      } else if (photo.dataUrl) {
+        // Mode 2 (Fallback backward compatibility): Unggah Base64 Buffer jika dataUrl dikirim
+        const timeHHmm = `${getWIBDateParts(capturedDate).hour}${getWIBDateParts(capturedDate).minute}`;
+        const dateFormatted = `${year}-${month}-${day}`;
+        const customerSlug = createSafeSlug(customerName);
+        const fileName = `${dateFormatted}_${timeHHmm}_${marketingCode}_${customerSlug}_${sortOrder}.jpg`;
+        const storagePath = `${expectedPrefix}/${dateFormatted}/${fileName}`;
+
+        const base64Data = photo.dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        const { error: uploadError } = await supabase.storage
+          .from('kunjungan')
+          .upload(storagePath, buffer, {
+            contentType: 'image/jpeg',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error(`Gagal unggah fallback foto ${storagePath}:`, uploadError.message);
+          return NextResponse.json(
+            { error: `Gagal mengunggah foto ke-${sortOrder}: ${uploadError.message}. Kunjungan dibatalkan.` },
+            { status: 502 }
+          );
+        }
+
+        uploadedPhotos.push({
+          storagePath,
+          bytes: photo.bytes || buffer.length,
+          width: photo.width || null,
+          height: photo.height || null,
+          sha256: photo.sha256 || null,
+          sortOrder,
+        });
+      } else {
         return NextResponse.json(
-          { error: `Gagal mengunggah foto ke-${sortOrder}: ${uploadError.message}. Kunjungan dibatalkan.` },
-          { status: 502 }
+          { error: `Foto ke-${sortOrder} tidak memiliki dataUrl maupun storage_path yang valid.` },
+          { status: 400 }
         );
       }
-
-      uploadedPhotos.push({
-        storagePath,
-        bytes: photo.bytes || buffer.length,
-        width: photo.width || null,
-        height: photo.height || null,
-        sha256: photo.sha256 || null,
-        sortOrder,
-      });
     }
 
     // 7. Simpan Baris Kunjungan ke Database (semua foto sudah terunggah)

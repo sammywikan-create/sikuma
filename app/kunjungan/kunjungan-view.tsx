@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { formatWIB, getWIBDateString, isSameWIBDay } from '@/lib/utils/time';
 import { formatRupiah } from '@/lib/utils/format';
+import { loadMoreMarketingVisitsAction } from './actions';
 import QueuedVisitsCard from '@/components/offline/queued-visits-card';
 import type { Profile, Visit, VisitPhoto } from '@/lib/types/database';
 
@@ -14,6 +15,8 @@ export interface VisitWithPhotos extends Visit {
 
 interface KunjunganViewProps {
   initialVisits: VisitWithPhotos[];
+  initialHasMore?: boolean;
+  todayVisitsCount?: number;
   profile: Profile;
   userEmail: string;
   dailyTarget: number;
@@ -21,11 +24,15 @@ interface KunjunganViewProps {
 
 export default function KunjunganView({
   initialVisits,
+  initialHasMore = false,
+  todayVisitsCount,
   profile,
-  userEmail,
+  userEmail: _userEmail,
   dailyTarget,
 }: KunjunganViewProps) {
   const [visits, setVisits] = useState<VisitWithPhotos[]>(initialVisits);
+  const [hasMore, setHasMore] = useState<boolean>(initialHasMore);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
 
   // Realtime subscription untuk update kunjungan
   useEffect(() => {
@@ -333,6 +340,42 @@ export default function KunjunganView({
                 </article>
               );
             })}
+
+            {hasMore && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  disabled={isLoadingMore}
+                  onClick={async () => {
+                    setIsLoadingMore(true);
+                    try {
+                      const res = await loadMoreMarketingVisitsAction(visits.length, 20);
+                      if (res.data && res.data.length > 0) {
+                        setVisits((prev) => [
+                          ...prev,
+                          ...(res.data as unknown as VisitWithPhotos[]),
+                        ]);
+                      }
+                      setHasMore(res.hasMore || false);
+                    } catch (err) {
+                      console.error('Gagal memuat kunjungan lainnya:', err);
+                    } finally {
+                      setIsLoadingMore(false);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-white border border-slate-200 hover:bg-slate-50 active:bg-slate-100 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-bkk-600 border-t-transparent rounded-full animate-spin"></span>
+                      Memuat data tambahan...
+                    </>
+                  ) : (
+                    '⬇ Muat Lebih Banyak Kunjungan'
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>

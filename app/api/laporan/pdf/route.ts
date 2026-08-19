@@ -127,23 +127,44 @@ export async function GET(request: NextRequest) {
 
     const visits = visitsRaw || [];
 
-    // 6. Buat Signed URLs untuk Setiap Foto di Storage Bucket
-    let totalPhotoCount = 0;
+    // 5b. Batas Aman Kapasitas Ekspor (Maksimal 500 Kunjungan)
+    if (visits.length > 500) {
+      return NextResponse.json(
+        {
+          error: `Rentang data terlalu besar (${visits.length} kunjungan ditemukan). Batas maksimal ekspor adalah 500 kunjungan. Harap persempit rentang tanggal atau pilih filter marketing tertentu.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 6. Buat Signed URLs secara BATCH / Paralel (Maksimal 10 concurrent requests)
+    const photoItems: { photo: VisitPhoto; path: string }[] = [];
     for (const v of visits) {
       if (v.visit_photos && Array.isArray(v.visit_photos)) {
         for (const p of v.visit_photos) {
-          totalPhotoCount++;
           if (p.storage_path) {
-            const { data: signed } = await supabase.storage
-              .from('kunjungan')
-              .createSignedUrl(p.storage_path, 600);
-            if (signed?.signedUrl) {
-              (p as unknown as { signedUrl: string }).signedUrl = signed.signedUrl;
-            }
+            photoItems.push({ photo: p, path: p.storage_path });
           }
         }
       }
     }
+
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < photoItems.length; i += BATCH_SIZE) {
+      const batch = photoItems.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map(async ({ photo, path }) => {
+          const { data: signed } = await supabase.storage
+            .from('kunjungan')
+            .createSignedUrl(path, 600);
+          if (signed?.signedUrl) {
+            (photo as unknown as { signedUrl: string }).signedUrl = signed.signedUrl;
+          }
+        })
+      );
+    }
+
+    const totalPhotoCount = photoItems.length;
 
     // 7. Hitung Agregasi Ringkasan per Marketing
     const summariesMap = new Map<string, PDFReportData['marketingSummaries'][0]>();
@@ -207,20 +228,28 @@ export async function GET(request: NextRequest) {
       active_days: activeDaysPerMarketing.get(s.marketing_id)?.size || 0,
     }));
 
-    // 8. Logika Pemecahan ZIP Bila Total Foto > 200
+    // 8. Logika Pemecahan ZIP Bila Total Foto > 200 (Dengan Penanganan Stream Tuntas & Bebas Truncation)
     if (totalPhotoCount > 200) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const archiverModule: any = await import('archiver');
       const archiverFn = (archiverModule.default || archiverModule) as (format: string, options: unknown) => {
         append: (source: unknown, data: { name: string }) => void;
         finalize: () => Promise<void>;
         pipe: (dest: unknown) => void;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        on: (event: string, cb: any) => void;
       };
       const archive = archiverFn('zip', { zlib: { level: 6 } });
       const passThrough = new PassThrough();
       archive.pipe(passThrough);
 
-      const chunks: Buffer[] = [];
-      passThrough.on('data', (chunk) => chunks.push(chunk));
+      const zipPromise = new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        passThrough.on('data', (chunk) => chunks.push(chunk));
+        passThrough.on('end', () => resolve(Buffer.concat(chunks)));
+        passThrough.on('error', (err) => reject(err));
+        archive.on('error', (err: unknown) => reject(err));
+      });
 
       for (const m of marketings) {
         const mVisits = visits.filter((v) => v.marketing_id === m.id);
@@ -249,9 +278,10 @@ export async function GET(request: NextRequest) {
       }
 
       await archive.finalize();
+      const zipBuffer = await zipPromise;
 
       const zipFileName = `Laporan_Kunjungan_${jenis}_${dari}_${sampai}.zip`;
-      return new NextResponse(Buffer.concat(chunks) as unknown as BodyInit, {
+      return new NextResponse(zipBuffer as unknown as BodyInit, {
         headers: {
           'Content-Type': 'application/zip',
           'Content-Disposition': `attachment; filename="${zipFileName}"`,
