@@ -219,6 +219,16 @@ export default function PenagihanView({
           </span>
           <span className="text-slate-400">→</span>
         </Link>
+
+        <Link
+          href="/profil"
+          className="w-full py-2 px-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl flex items-center justify-between text-xs font-semibold shadow-sm transition"
+        >
+          <span className="flex items-center gap-1.5">
+            <span>🔒</span> Ganti Password
+          </span>
+          <span className="text-slate-400">→</span>
+        </Link>
       </div>
 
       {/* 5. Daftar Riwayat Penagihan */}

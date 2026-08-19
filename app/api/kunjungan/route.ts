@@ -285,7 +285,68 @@ export async function POST(request: Request) {
       }
     }
 
-    // 6. Simpan Baris Kunjungan ke Database
+    // 6. KEAMANAN: Unggah foto DULU sebelum commit baris kunjungan
+    //    Jika upload gagal, kunjungan tidak akan tersimpan tanpa bukti foto
+    const year = capturedDate.getUTCFullYear().toString();
+    const month = (capturedDate.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = capturedDate.getUTCDate().toString().padStart(2, '0');
+    const hours = (capturedDate.getUTCHours() + 7) % 24;
+    const mins = capturedDate.getUTCMinutes();
+    const timeHHmm = `${hours.toString().padStart(2, '0')}${mins.toString().padStart(2, '0')}`;
+    const dateFormatted = `${year}-${month}-${day}`;
+
+    const marketingCode = profile.marketing_code || 'MKT00';
+    const marketingSlug = createSafeSlug(profile.full_name);
+    const customerSlug = createSafeSlug(customerName);
+
+    const folderPrefix = `${year}/${month}/${marketingCode}_${marketingSlug}/${dateFormatted}`;
+
+    interface UploadedPhoto {
+      storagePath: string;
+      bytes: number;
+      width: number | null;
+      height: number | null;
+      sha256: string | null;
+      sortOrder: number;
+    }
+
+    const uploadedPhotos: UploadedPhoto[] = [];
+
+    for (let i = 0; i < body.photos.length; i++) {
+      const photo = body.photos[i];
+      const sortOrder = photo.sort_order || i + 1;
+      const fileName = `${dateFormatted}_${timeHHmm}_${marketingCode}_${customerSlug}_${sortOrder}.jpg`;
+      const storagePath = `${folderPrefix}/${fileName}`;
+
+      const base64Data = photo.dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      const { error: uploadError } = await supabase.storage
+        .from('kunjungan')
+        .upload(storagePath, buffer, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error(`Gagal unggah foto ${storagePath}:`, uploadError.message);
+        return NextResponse.json(
+          { error: `Gagal mengunggah foto ke-${sortOrder}: ${uploadError.message}. Kunjungan dibatalkan.` },
+          { status: 500 }
+        );
+      }
+
+      uploadedPhotos.push({
+        storagePath,
+        bytes: photo.bytes || buffer.length,
+        width: photo.width || null,
+        height: photo.height || null,
+        sha256: photo.sha256 || null,
+        sortOrder,
+      });
+    }
+
+    // 7. Simpan Baris Kunjungan ke Database (semua foto sudah terunggah)
     const visitTable = supabase.from('visits') as unknown as SupabaseQueryHelper;
     const { data: newVisit, error: visitError } = await visitTable
       .insert({
@@ -320,57 +381,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // 7. Unggah Berkas Foto ke Storage Privat 'kunjungan'
-    const year = capturedDate.getUTCFullYear().toString();
-    const month = (capturedDate.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = capturedDate.getUTCDate().toString().padStart(2, '0');
-    const hours = (capturedDate.getUTCHours() + 7) % 24;
-    const mins = capturedDate.getUTCMinutes();
-    const timeHHmm = `${hours.toString().padStart(2, '0')}${mins.toString().padStart(2, '0')}`;
-    const dateFormatted = `${year}-${month}-${day}`;
-
-    const marketingCode = profile.marketing_code || 'MKT00';
-    const marketingSlug = createSafeSlug(profile.full_name);
-    const customerSlug = createSafeSlug(customerName);
-
-    const folderPrefix = `${year}/${month}/${marketingCode}_${marketingSlug}/${dateFormatted}`;
-
+    // 8. Simpan metadata foto ke tabel visit_photos
     const photoTable = supabase.from('visit_photos') as unknown as SupabaseSimpleInsertHelper;
 
-    for (let i = 0; i < body.photos.length; i++) {
-      const photo = body.photos[i];
-      const sortOrder = photo.sort_order || i + 1;
-      const fileName = `${dateFormatted}_${timeHHmm}_${marketingCode}_${customerSlug}_${sortOrder}.jpg`;
-      const storagePath = `${folderPrefix}/${fileName}`;
-
-      const base64Data = photo.dataUrl.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
-
-      const { error: uploadError } = await supabase.storage
-        .from('kunjungan')
-        .upload(storagePath, buffer, {
-          contentType: 'image/jpeg',
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.warn(`Gagal unggah storage ${storagePath}:`, uploadError.message);
-      }
-
-      await photoTable.insert({
+    for (const up of uploadedPhotos) {
+      const { error: photoInsertErr } = await photoTable.insert({
         visit_id: newVisit.id,
-        storage_path: storagePath,
-        bytes: photo.bytes || buffer.length,
-        width: photo.width || null,
-        height: photo.height || null,
-        sha256: photo.sha256 || null,
-        sort_order: sortOrder,
+        storage_path: up.storagePath,
+        bytes: up.bytes,
+        width: up.width,
+        height: up.height,
+        sha256: up.sha256,
+        sort_order: up.sortOrder,
       });
+
+      if (photoInsertErr) {
+        console.warn(`Gagal simpan metadata foto ${up.storagePath}:`, photoInsertErr.message);
+      }
     }
 
-    // 8. Catat Log Audit Penambahan Kunjungan
+    // 9. Catat Log Audit Penambahan Kunjungan (dengan error checking)
     const auditTable = supabase.from('audit_log') as unknown as SupabaseSimpleInsertHelper;
-    await auditTable.insert({
+    const { error: auditErr } = await auditTable.insert({
       actor_id: user.id,
       action: 'visit_created',
       entity: 'visits',
@@ -386,6 +418,10 @@ export async function POST(request: Request) {
         is_late: isLate,
       },
     });
+
+    if (auditErr) {
+      console.warn('Gagal menulis audit log:', auditErr.message);
+    }
 
     return NextResponse.json({
       success: true,

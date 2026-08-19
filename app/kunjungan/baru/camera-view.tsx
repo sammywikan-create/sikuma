@@ -244,62 +244,33 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
     };
   }, [isSimulate]);
 
-  // 4. Render Frame Mock Simulasi
-  const generateSimulatedFrame = (): HTMLCanvasElement => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1280;
-    canvas.height = 960;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      const grad = ctx.createLinearGradient(0, 0, 1280, 960);
-      grad.addColorStop(0, '#1e293b');
-      grad.addColorStop(0.5, '#334155');
-      grad.addColorStop(1, '#0f172a');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 1280, 960);
+  // 4. [DIHAPUS] generateSimulatedFrame — tidak boleh ada frame palsu di produksi
 
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(200, 250, 880, 500);
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(300, 350, 200, 300);
-      ctx.fillRect(780, 350, 200, 300);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(560, 420, 160, 330);
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('TOKO MAJU JAYA (SIMULASI KUNJUNGAN NASABAH)', 640, 180);
-      ctx.font = '22px sans-serif';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText('Kamera & Lokasi Simulasi Bank BKK', 640, 220);
-    }
-    return canvas;
-  };
+  // Cek apakah GPS sudah siap (lat/lng bukan null)
+  const isGpsReady = gps.lat !== null && gps.lng !== null && !gps.isLocked && !gps.isLoading;
 
   // 5. Ambil Foto & Bakar Watermark
   const handleCapture = async () => {
-    if (photos.length >= 3 || gps.isLocked || isCapturing || isMemoryFull) return;
+    // KEAMANAN: Blokir capture jika GPS belum terkunci atau kamera belum aktif
+    if (photos.length >= 3 || !isGpsReady || isCapturing || isMemoryFull) return;
+
+    if (!videoRef.current || videoRef.current.videoWidth === 0) {
+      alert('Kamera belum aktif. Harap izinkan akses kamera.');
+      return;
+    }
 
     try {
       setIsCapturing(true);
 
-      const lat = gps.lat ?? -7.005;
-      const lng = gps.lng ?? 110.438;
-      const accuracy = gps.accuracy ?? 10;
-      const address = gps.address || 'Semarang Tengah, Kota Semarang';
+      // KEAMANAN: Tidak ada fallback — GPS wajib ada nilai nyata
+      const lat = gps.lat!;
+      const lng = gps.lng!;
+      const accuracy = gps.accuracy!;
+      const address = gps.address || '';
 
-      let sourceImage: CanvasImageSource;
-      let sourceWidth = 1280;
-      let sourceHeight = 960;
-
-      if (videoRef.current && videoRef.current.videoWidth > 0) {
-        sourceImage = videoRef.current;
-        sourceWidth = videoRef.current.videoWidth;
-        sourceHeight = videoRef.current.videoHeight;
-      } else {
-        sourceImage = generateSimulatedFrame();
-      }
+      const sourceImage: CanvasImageSource = videoRef.current;
+      const sourceWidth = videoRef.current.videoWidth;
+      const sourceHeight = videoRef.current.videoHeight;
 
       const result: ProcessedPhotoResult = await applyWatermarkAndCompress(
         sourceImage,
@@ -758,9 +729,9 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
               id="shutter-button"
               type="button"
               onClick={handleCapture}
-              disabled={gps.isLocked || photos.length >= 3 || isCapturing || isMemoryFull}
+              disabled={!isGpsReady || photos.length >= 3 || isCapturing || isMemoryFull}
               className={`w-14 h-14 rounded-full border-3 border-white flex items-center justify-center p-1 smooth-transition shadow-2xl ${
-                gps.isLocked || photos.length >= 3 || isCapturing || isMemoryFull
+                !isGpsReady || photos.length >= 3 || isCapturing || isMemoryFull
                   ? 'opacity-40 cursor-not-allowed border-slate-600'
                   : 'active:scale-95 cursor-pointer bg-black/40 hover:bg-black/60'
               }`}

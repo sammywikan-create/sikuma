@@ -24,7 +24,8 @@ export default async function KunjunganBaruPage() {
     redirect('/dasbor');
   }
 
-  const isSimulate = process.env.NEXT_PUBLIC_DEV_SIMULATE === '1';
+  // KEAMANAN: Simulasi hanya aktif di development, TIDAK pernah di production
+  const isSimulate = process.env.NEXT_PUBLIC_DEV_SIMULATE === '1' && process.env.NODE_ENV !== 'production';
 
   return (
     <CameraView
