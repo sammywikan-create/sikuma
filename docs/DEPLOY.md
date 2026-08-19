@@ -43,14 +43,11 @@ NEXT_PUBLIC_DEV_SIMULATE=0
 npx tsx scripts/seed.ts
 ```
 
-Akun default yang terbentuk:
-- **Kepala Cabang**: `kacab@bkk.co.id` | Sandi: `Password123!`
-- **Administrator**: `admin@bkk.co.id` | Sandi: `Password123!`
-- **Marketing 01**: `mkt01@bkk.co.id` | Sandi: `Password123!`
-- **Marketing 02**: `mkt02@bkk.co.id` | Sandi: `Password123!`
-- **Marketing 03**: `mkt03@bkk.co.id` | Sandi: `Password123!`
+Akun default yang terbentuk (kata sandi dicetak ke konsol saat seed):
+- **Kepala Cabang**: `kacab@bkk.co.id`
+- **Administrator**: `admin@bkk.co.id`
 
-*(Catatan: Segera minta pengguna mengganti kata sandi setelah login pertama kali).*
+> ⚠️ **Kata sandi dibangkitkan acak per eksekusi seed.** Salin dari output konsol dan wajib diganti setelah login pertama.
 
 ---
 

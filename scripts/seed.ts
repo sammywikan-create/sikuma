@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import * as crypto from 'crypto';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -32,13 +33,13 @@ interface SeedUser {
 const SEED_USERS: SeedUser[] = [
   {
     email: 'kacab@bkk.co.id',
-    password: 'Password123!',
+    password: crypto.randomUUID().slice(0, 16) + '!A',
     fullName: 'Budi Santoso, S.E.',
     role: 'kacab',
   },
   {
     email: 'admin@bkk.co.id',
-    password: 'Password123!',
+    password: crypto.randomUUID().slice(0, 16) + '!A',
     fullName: 'Administrator Pusat',
     role: 'admin',
   },

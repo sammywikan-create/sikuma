@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { writeAuditLog } from '@/lib/audit/log';
 import type { VerificationStatus, Profile, UserRole } from '@/lib/types/database';
 
 export async function verifyVisitAction(
@@ -33,13 +34,9 @@ export async function verifyVisitAction(
   const now = new Date().toISOString();
 
   // 1. Update kolom verifikasi pada tabel visits (RLS mengizinkan update kolom ini)
-  const visitsTable = supabase.from('visits') as unknown as {
-    update: (data: Record<string, unknown>) => {
-      eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>;
-    };
-  };
-
-  const { error: updateErr } = await visitsTable
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: updateErr } = await (supabase as any)
+    .from('visits')
     .update({
       verification_status: status,
       verified_by: user.id,
@@ -54,15 +51,12 @@ export async function verifyVisitAction(
 
   // 2. Catat ke tabel audit_log
   const actionName = status === 'verified' ? 'visit_verified' : 'visit_rejected';
-  const auditTable = supabase.from('audit_log') as unknown as {
-    insert: (data: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-  };
-
-  await auditTable.insert({
-    actor_id: user.id,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await writeAuditLog(supabase as any, {
+    actorId: user.id,
     action: actionName,
     entity: 'visits',
-    entity_id: visitId,
+    entityId: visitId,
     payload: {
       status,
       verifier_name: profile.full_name,
@@ -137,7 +131,7 @@ export async function createMarketingUserAction(payload: {
       }
     }
 
-    const password = payload.password?.trim() || 'Password123!';
+    const password = payload.password?.trim() || crypto.randomUUID().slice(0, 16) + '!A';
 
     // 1. Buat auth user di Supabase Auth
     const { data: newAuthUser, error: authErr } = await adminClient.auth.admin.createUser({
@@ -171,8 +165,9 @@ export async function createMarketingUserAction(payload: {
       return { error: `Gagal menyimpan profil: ${profileErr.message}` };
     }
 
-    // 3. Catat audit_log
-    await adminClient.from('audit_log').insert({
+    // 3. Catat audit_log (adminClient dipakai karena policy actor_id = auth.uid()
+    //    dan adminClient bypass RLS)
+    const { error: auditErr } = await adminClient.from('audit_log').insert({
       actor_id: user.id,
       action: 'user_created',
       entity: 'profiles',
@@ -186,8 +181,12 @@ export async function createMarketingUserAction(payload: {
       },
     });
 
+    if (auditErr) {
+      console.error(`[AUDIT] Gagal menulis log user_created: ${auditErr.message}`);
+    }
+
     revalidatePath('/dasbor/pengguna');
-    return { success: true };
+    return { success: true, generatedPassword: password };
   } catch (err: unknown) {
     console.error('Error in createMarketingUserAction:', err);
     return { error: `Terjadi galat server: ${(err as Error).message}` };
@@ -254,13 +253,17 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
       return { error: `Gagal mengubah status pengguna: ${updateErr.message}` };
     }
 
-    await adminClient.from('audit_log').insert({
+    const { error: auditErr } = await adminClient.from('audit_log').insert({
       actor_id: user.id,
       action: newStatus ? 'user_activated' : 'user_deactivated',
       entity: 'profiles',
       entity_id: userId,
       payload: { is_active: newStatus },
     });
+
+    if (auditErr) {
+      console.error(`[AUDIT] Gagal menulis log toggle status: ${auditErr.message}`);
+    }
 
     revalidatePath('/dasbor/pengguna');
     return { success: true };

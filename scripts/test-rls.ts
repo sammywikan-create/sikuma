@@ -17,7 +17,7 @@ async function runRlsTests() {
   const clientMkt01 = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
   const { data: authMkt01, error: errAuth1 } = await clientMkt01.auth.signInWithPassword({
     email: 'mkt01@bkk.co.id',
-    password: 'Password123!',
+    password: process.env.TEST_PASSWORD || 'ChangeMe_RunSeedFirst!',
   });
   if (errAuth1 || !authMkt01.user) {
     throw new Error(`Gagal login MKT01: ${errAuth1?.message}`);
@@ -28,7 +28,7 @@ async function runRlsTests() {
   const clientMkt02 = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
   const { data: authMkt02, error: errAuth2 } = await clientMkt02.auth.signInWithPassword({
     email: 'mkt02@bkk.co.id',
-    password: 'Password123!',
+    password: process.env.TEST_PASSWORD || 'ChangeMe_RunSeedFirst!',
   });
   if (errAuth2 || !authMkt02.user) {
     throw new Error(`Gagal login MKT02: ${errAuth2?.message}`);
@@ -39,7 +39,7 @@ async function runRlsTests() {
   const clientKacab = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
   const { data: authKacab, error: errAuthKacab } = await clientKacab.auth.signInWithPassword({
     email: 'kacab@bkk.co.id',
-    password: 'Password123!',
+    password: process.env.TEST_PASSWORD || 'ChangeMe_RunSeedFirst!',
   });
   if (errAuthKacab || !authKacab.user) {
     throw new Error(`Gagal login Kacab: ${errAuthKacab?.message}`);

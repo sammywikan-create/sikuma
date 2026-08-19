@@ -44,13 +44,13 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
 
-  // State GPS
+  // State GPS — selalu mulai null, simulasi diset di useEffect
   const [gps, setGps] = useState<GPSState>({
-    lat: isSimulate ? -7.005 : null,
-    lng: isSimulate ? 110.438 : null,
-    accuracy: isSimulate ? 10 : null,
-    address: isSimulate ? 'Jl. Pemuda No. 142, Sekayu, Kec. Semarang Tengah, Kota Semarang' : '',
-    isLoading: !isSimulate,
+    lat: null,
+    lng: null,
+    accuracy: null,
+    address: '',
+    isLoading: true,
     isLocked: false,
     isLowAccuracy: false,
   });
@@ -244,9 +244,26 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
     };
   }, [isSimulate]);
 
-  // 4. [DIHAPUS] generateSimulatedFrame — tidak boleh ada frame palsu di produksi
+  // 4. handleCapture — GPS dan kamera wajib siap
 
-  // Cek apakah GPS sudah siap (lat/lng bukan null)
+  // Helper: buat canvas simulasi (HANYA dipanggil saat isSimulate === true)
+  const createSimulationCanvas = (): HTMLCanvasElement => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 960;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, 1280, 960);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 32px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('MODE SIMULASI — Frame Dummy', 640, 480);
+    }
+    return canvas;
+  };
+
+  // Cek apakah GPS sudah siap (lat/lng bukan null, tidak loading, tidak locked)
   const isGpsReady = gps.lat !== null && gps.lng !== null && !gps.isLocked && !gps.isLoading;
 
   // 5. Ambil Foto & Bakar Watermark
@@ -254,9 +271,19 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
     // KEAMANAN: Blokir capture jika GPS belum terkunci atau kamera belum aktif
     if (photos.length >= 3 || !isGpsReady || isCapturing || isMemoryFull) return;
 
-    if (!videoRef.current || videoRef.current.videoWidth === 0) {
-      alert('Kamera belum aktif. Harap izinkan akses kamera.');
+    // KEAMANAN: Tanpa GPS nyata, hentikan proses
+    if (gps.lat === null || gps.lng === null) {
+      setSubmitError('Koordinat GPS belum tersedia. Pastikan GPS aktif dan tunggu sinyal terkunci.');
       return;
+    }
+
+    if (!videoRef.current || videoRef.current.videoWidth === 0) {
+      if (isSimulate) {
+        // Mode simulasi boleh pakai frame dummy via canvas
+      } else {
+        setSubmitError('Kamera belum siap. Mohon tunggu atau muat ulang halaman.');
+        return;
+      }
     }
 
     try {
@@ -268,9 +295,11 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
       const accuracy = gps.accuracy!;
       const address = gps.address || '';
 
-      const sourceImage: CanvasImageSource = videoRef.current;
-      const sourceWidth = videoRef.current.videoWidth;
-      const sourceHeight = videoRef.current.videoHeight;
+      const sourceImage: CanvasImageSource = isSimulate && (!videoRef.current || videoRef.current.videoWidth === 0)
+        ? createSimulationCanvas()
+        : videoRef.current!;
+      const sourceWidth = isSimulate && (!videoRef.current || videoRef.current.videoWidth === 0) ? 1280 : videoRef.current!.videoWidth;
+      const sourceHeight = isSimulate && (!videoRef.current || videoRef.current.videoWidth === 0) ? 960 : videoRef.current!.videoHeight;
 
       const result: ProcessedPhotoResult = await applyWatermarkAndCompress(
         sourceImage,
@@ -439,8 +468,35 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
         const data = await res.json();
 
         if (!res.ok) {
-          // Server merespons dengan galat (misal validasi / skema)
-          setSubmitError(data.error || `Server menolak pengiriman (${res.status}).`);
+          // Server merespons dengan galat — simpan ke antrean IndexedDB untuk retry
+          const serverError = data.error || `Server menolak pengiriman (${res.status}).`;
+
+          await enqueueVisit({
+            client_uuid: clientUuid,
+            customer_name: customerName.trim(),
+            visit_type: visitType,
+            product,
+            outcome,
+            potential_value: potentialNum,
+            baki_debet: bakiDebetNum,
+            kolektibilitas: visitType === 'penagihan' ? kolektibilitas : null,
+            notes: notes.trim() || null,
+            captured_at: primaryPhoto.captured_at,
+            lat: primaryPhoto.lat,
+            lng: primaryPhoto.lng,
+            accuracy_m: primaryPhoto.accuracy_m,
+            address: primaryPhoto.address || null,
+            photos,
+            status: 'pending',
+            retry_count: 0,
+            last_error: serverError,
+            created_at: new Date().toISOString(),
+          });
+
+          await clearCurrentDraft();
+          await refreshQueueStatus();
+
+          setSubmitError(`${serverError} Data disimpan di antrean untuk dicoba ulang.`);
           return;
         }
 
@@ -700,7 +756,7 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
               📷
             </div>
             <p className="text-xs font-semibold text-slate-200">
-              Live Preview Kamera Simulasi
+              {isSimulate ? 'Live Preview Kamera Simulasi' : 'Kamera belum siap. Mohon tunggu atau muat ulang halaman.'}
             </p>
           </div>
         )}
@@ -724,7 +780,7 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
 
         {/* Shutter Button Overlay */}
         {hasCameraPermission && (
-          <div className="absolute bottom-3 inset-x-0 flex items-center justify-center z-10">
+          <div className="absolute bottom-3 inset-x-0 flex flex-col items-center justify-center z-10 gap-1.5">
             <button
               id="shutter-button"
               type="button"
@@ -746,6 +802,11 @@ export default function CameraView({ profile, isSimulate }: CameraViewProps) {
                 }`}
               ></div>
             </button>
+            {!isGpsReady && (
+              <span className="text-[11px] text-amber-300 font-semibold animate-pulse bg-black/60 px-3 py-1 rounded-full">
+                📡 Menunggu sinyal GPS terkunci...
+              </span>
+            )}
           </div>
         )}
       </div>

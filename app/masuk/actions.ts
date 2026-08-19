@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { checkRateLimit } from '@/lib/security/rate-limit';
 import type { Profile } from '@/lib/types/database';
 
 export type FormState = {
@@ -16,10 +17,18 @@ export async function loginAction(prevState: FormState, formData: FormData): Pro
     return { error: 'Email dan kata sandi wajib diisi.' };
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Pembatasan laju: maks 5 percobaan gagal per 15 menit per email
+  const rateLimit = checkRateLimit(`login_${normalizedEmail}`, 5, 900000);
+  if (!rateLimit.isAllowed) {
+    return { error: 'Terlalu banyak percobaan masuk. Coba lagi dalam beberapa menit.' };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim(),
+    email: normalizedEmail,
     password: password.trim(),
   });
 

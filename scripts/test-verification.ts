@@ -18,7 +18,7 @@ async function runStage5Tests() {
   const clientKacab = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
   const { data: authData, error: authErr } = await clientKacab.auth.signInWithPassword({
     email: 'kacab@bkk.co.id',
-    password: 'Password123!',
+    password: process.env.TEST_PASSWORD || 'ChangeMe_RunSeedFirst!',
   });
 
   if (authErr || !authData.user) {

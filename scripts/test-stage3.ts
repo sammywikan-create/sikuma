@@ -18,7 +18,7 @@ async function runStage3Tests() {
   const clientMkt = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
   const { data: authData, error: authErr } = await clientMkt.auth.signInWithPassword({
     email: 'mkt01@bkk.co.id',
-    password: 'Password123!',
+    password: process.env.TEST_PASSWORD || 'ChangeMe_RunSeedFirst!',
   });
 
   if (authErr || !authData.user) {

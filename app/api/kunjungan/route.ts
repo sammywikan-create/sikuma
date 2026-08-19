@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { calculateHaversineDistanceM, calculateSpeedKmH } from '@/lib/utils/geo';
 import { createSafeSlug } from '@/lib/utils/slug';
 import { checkRateLimit } from '@/lib/security/rate-limit';
+import { writeAuditLog } from '@/lib/audit/log';
 import type { VisitType, ProductType, OutcomeType, Profile, Visit, AppSetting, VisitPhoto } from '@/lib/types/database';
 
 const VALID_VISIT_TYPES: VisitType[] = [
@@ -50,17 +51,7 @@ interface IncomingVisitPayload {
   photos: IncomingPhoto[];
 }
 
-interface SupabaseQueryHelper {
-  insert: (record: unknown) => {
-    select: () => {
-      single: () => Promise<{ data: Visit | null; error: { message: string } | null }>;
-    };
-  };
-}
 
-interface SupabaseSimpleInsertHelper {
-  insert: (record: unknown) => Promise<{ error: { message: string } | null }>;
-}
 
 export async function POST(request: Request) {
   try {
@@ -203,9 +194,16 @@ export async function POST(request: Request) {
     const cutoffTimeStr = (cutoffSetting?.value as string) || '21:00';
     const [cutoffHour, cutoffMinute] = cutoffTimeStr.replace(/"/g, '').split(':').map(Number);
 
-    // Hitung waktu batas dalam WIB (UTC+7)
-    const receivedWIBHours = (receivedAt.getUTCHours() + 7) % 24;
-    const receivedWIBMinutes = receivedAt.getUTCMinutes();
+    // Hitung waktu batas dalam WIB via Intl (DILARANG aritmetika UTC+7 manual)
+    const wibTimeFmt = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const receivedWIBParts = wibTimeFmt.formatToParts(receivedAt);
+    const receivedWIBHours = Number(receivedWIBParts.find((p) => p.type === 'hour')?.value ?? '0');
+    const receivedWIBMinutes = Number(receivedWIBParts.find((p) => p.type === 'minute')?.value ?? '0');
 
     const isDifferentDay =
       receivedAt.getTime() - capturedDate.getTime() > 24 * 60 * 60 * 1000;
@@ -286,13 +284,22 @@ export async function POST(request: Request) {
     }
 
     // 6. KEAMANAN: Unggah foto DULU sebelum commit baris kunjungan
-    //    Jika upload gagal, kunjungan tidak akan tersimpan tanpa bukti foto
-    const year = capturedDate.getUTCFullYear().toString();
-    const month = (capturedDate.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = capturedDate.getUTCDate().toString().padStart(2, '0');
-    const hours = (capturedDate.getUTCHours() + 7) % 24;
-    const mins = capturedDate.getUTCMinutes();
-    const timeHHmm = `${hours.toString().padStart(2, '0')}${mins.toString().padStart(2, '0')}`;
+    //    Jika upload gagal, kompensasi file yang terlanjur terunggah, lalu batalkan.
+    const wibFormatter = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const wibParts = wibFormatter.formatToParts(capturedDate);
+    const getPart = (type: string) => wibParts.find((p) => p.type === type)?.value ?? '00';
+    const year = getPart('year');
+    const month = getPart('month');
+    const day = getPart('day');
+    const timeHHmm = `${getPart('hour')}${getPart('minute')}`;
     const dateFormatted = `${year}-${month}-${day}`;
 
     const marketingCode = profile.marketing_code || 'MKT00';
@@ -325,14 +332,26 @@ export async function POST(request: Request) {
         .from('kunjungan')
         .upload(storagePath, buffer, {
           contentType: 'image/jpeg',
-          upsert: true,
+          upsert: false,
         });
 
       if (uploadError) {
         console.error(`Gagal unggah foto ${storagePath}:`, uploadError.message);
+
+        // Kompensasi: hapus file yang terlanjur terunggah pada request ini
+        if (uploadedPhotos.length > 0) {
+          const pathsToRemove = uploadedPhotos.map((up) => up.storagePath);
+          const { error: removeErr } = await supabase.storage
+            .from('kunjungan')
+            .remove(pathsToRemove);
+          if (removeErr) {
+            console.error('Gagal kompensasi hapus foto:', removeErr.message);
+          }
+        }
+
         return NextResponse.json(
           { error: `Gagal mengunggah foto ke-${sortOrder}: ${uploadError.message}. Kunjungan dibatalkan.` },
-          { status: 500 }
+          { status: 502 }
         );
       }
 
@@ -347,8 +366,9 @@ export async function POST(request: Request) {
     }
 
     // 7. Simpan Baris Kunjungan ke Database (semua foto sudah terunggah)
-    const visitTable = supabase.from('visits') as unknown as SupabaseQueryHelper;
-    const { data: newVisit, error: visitError } = await visitTable
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: newVisit, error: visitError } = await (supabase as any)
+      .from('visits')
       .insert({
         client_uuid: body.client_uuid,
         marketing_id: user.id,
@@ -368,7 +388,7 @@ export async function POST(request: Request) {
         address: body.address?.trim() || null,
         anomaly_flags: anomalyFlags,
         is_late: isLate,
-        verification_status: 'pending',
+        verification_status: 'pending' as const,
       })
       .select()
       .single();
@@ -382,31 +402,32 @@ export async function POST(request: Request) {
     }
 
     // 8. Simpan metadata foto ke tabel visit_photos
-    const photoTable = supabase.from('visit_photos') as unknown as SupabaseSimpleInsertHelper;
-
     for (const up of uploadedPhotos) {
-      const { error: photoInsertErr } = await photoTable.insert({
-        visit_id: newVisit.id,
-        storage_path: up.storagePath,
-        bytes: up.bytes,
-        width: up.width,
-        height: up.height,
-        sha256: up.sha256,
-        sort_order: up.sortOrder,
-      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: photoInsertErr } = await (supabase as any)
+        .from('visit_photos')
+        .insert({
+          visit_id: newVisit.id,
+          storage_path: up.storagePath,
+          bytes: up.bytes,
+          width: up.width,
+          height: up.height,
+          sha256: up.sha256,
+          sort_order: up.sortOrder,
+        });
 
       if (photoInsertErr) {
-        console.warn(`Gagal simpan metadata foto ${up.storagePath}:`, photoInsertErr.message);
+        console.error(`Gagal simpan metadata foto ${up.storagePath}:`, photoInsertErr.message);
       }
     }
 
-    // 9. Catat Log Audit Penambahan Kunjungan (dengan error checking)
-    const auditTable = supabase.from('audit_log') as unknown as SupabaseSimpleInsertHelper;
-    const { error: auditErr } = await auditTable.insert({
-      actor_id: user.id,
+    // 9. Catat Log Audit Penambahan Kunjungan
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await writeAuditLog(supabase as any, {
+      actorId: user.id,
       action: 'visit_created',
       entity: 'visits',
-      entity_id: newVisit.id,
+      entityId: newVisit.id,
       payload: {
         customer_name: customerName,
         visit_type: body.visit_type,
@@ -418,10 +439,6 @@ export async function POST(request: Request) {
         is_late: isLate,
       },
     });
-
-    if (auditErr) {
-      console.warn('Gagal menulis audit log:', auditErr.message);
-    }
 
     return NextResponse.json({
       success: true,

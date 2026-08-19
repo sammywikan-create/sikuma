@@ -65,13 +65,13 @@ npm run seed
 
 Daftar akun yang dibuat oleh skrip seed:
 
-| Peran | Nama | Kode | Email | Kata Sandi |
-| :--- | :--- | :--- | :--- | :--- |
-| **Kepala Cabang** | Budi Santoso | - | `kacab@bkk.co.id` | `Password123!` |
-| **Admin** | Administrator Pusat | - | `admin@bkk.co.id` | `Password123!` |
-| **Marketing** | Ahmad Dahlan | MKT01 | `mkt01@bkk.co.id` | `Password123!` |
-| **Marketing** | Siti Rahayu | MKT02 | `mkt02@bkk.co.id` | `Password123!` |
-| **Marketing** | Eko Prasetyo | MKT03 | `mkt03@bkk.co.id` | `Password123!` |
+> **Catatan Keamanan:** Kata sandi dibangkitkan secara acak saat menjalankan `npm run seed` dan dicetak ke konsol dalam bentuk tabel. Salin dan simpan kata sandi tersebut dengan aman — **kata sandi tidak akan ditampilkan lagi**. Wajib diganti setelah login pertama.
+
+| Peran | Nama | Email |
+| :--- | :--- | :--- |
+| **Kepala Cabang** | Budi Santoso | `kacab@bkk.co.id` |
+| **Admin** | Administrator Pusat | `admin@bkk.co.id` |
+
 
 ### 4. Menjalankan Server Pengembangan
 ```bash

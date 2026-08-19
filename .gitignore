@@ -34,5 +34,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# laporan PDF (generated, jangan di-track)
+# laporan PDF/ZIP (generated, jangan di-track)
 *.pdf
+*.zip
+/laporan-contoh/

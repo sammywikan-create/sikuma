@@ -88,7 +88,7 @@ export type Database = {
         Row: Profile;
         Insert: Partial<Profile> & { id: string; full_name: string; role: UserRole };
         Update: Partial<Profile>;
-        Relationships: [];
+        Relationships: never[];
       };
       visits: {
         Row: Visit;
@@ -117,7 +117,7 @@ export type Database = {
           verifier_note?: string | null;
         };
         Update: Partial<Visit>;
-        Relationships: [];
+        Relationships: never[];
       };
       visit_photos: {
         Row: VisitPhoto;
@@ -131,7 +131,7 @@ export type Database = {
           sort_order?: number;
         };
         Update: Partial<VisitPhoto>;
-        Relationships: [];
+        Relationships: never[];
       };
       audit_log: {
         Row: AuditLog;
@@ -143,13 +143,13 @@ export type Database = {
           payload?: Record<string, unknown> | null;
         };
         Update: Partial<AuditLog>;
-        Relationships: [];
+        Relationships: never[];
       };
       app_settings: {
         Row: AppSetting;
         Insert: { key: string; value: unknown };
         Update: Partial<AppSetting>;
-        Relationships: [];
+        Relationships: never[];
       };
     };
     Views: {
