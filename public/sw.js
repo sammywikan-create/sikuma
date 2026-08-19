@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sikuma-app-shell-v1';
+const CACHE_NAME = 'sikuma-app-shell-v2';
 const STATIC_ASSETS = [
   '/',
   '/masuk',
@@ -34,18 +34,35 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  const request = event.request;
 
-  // Jangan pernah cache endpoint API atau Supabase atau data dinamis nasabah
+  // 1. Abaikan protokol non-HTTP/HTTPS (seperti chrome-extension://, moz-extension://, file://, data:)
+  if (!request.url.startsWith('http://') && !request.url.startsWith('https://')) {
+    return;
+  }
+
+  // 2. Hanya proses request dengan metode GET
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return;
+  }
+
+  // 3. Jangan pernah cache endpoint API, Supabase, atau stream laporan
   if (
     url.pathname.startsWith('/api/') ||
-    url.hostname.includes('supabase') ||
-    event.request.method !== 'GET'
+    url.pathname.startsWith('/auth/') ||
+    url.hostname.includes('supabase')
   ) {
     return;
   }
 
-  // Strategi Cache-First untuk aset statis Next.js & font/gambar lokal
+  // 4. Strategi Cache-First untuk aset statis Next.js & font/gambar lokal
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.endsWith('.js') ||
@@ -53,15 +70,20 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.png') ||
     url.pathname.endsWith('.jpg') ||
     url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.ico') ||
     url.pathname.endsWith('.woff2')
   ) {
     event.respondWith(
-      caches.match(event.request).then((cached) => {
+      caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response.status === 200) {
+        return fetch(request).then((response) => {
+          if (response.status === 200 && response.type === 'basic') {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, clone).catch((err) => {
+                console.warn('SW cache put error:', err);
+              });
+            });
           }
           return response;
         });
@@ -70,21 +92,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategi Network-First dengan Fallback ke Cache untuk halaman App Shell
+  // 5. Strategi Network-First dengan Fallback ke Cache untuk halaman App Shell
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((networkResponse) => {
-        if (networkResponse.status === 200) {
+        if (networkResponse.status === 200 && networkResponse.type === 'basic') {
           const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, clone).catch((err) => {
+              console.warn('SW cache put error:', err);
+            });
+          });
         }
         return networkResponse;
       })
       .catch(() => {
-        return caches.match(event.request).then((cached) => {
+        return caches.match(request).then((cached) => {
           if (cached) return cached;
-          if (event.request.mode === 'navigate') {
-            return caches.match('/kunjungan/baru') || caches.match('/kunjungan') || caches.match('/masuk');
+          if (request.mode === 'navigate') {
+            return (
+              caches.match('/kunjungan/baru') ||
+              caches.match('/kunjungan') ||
+              caches.match('/masuk')
+            );
           }
           return new Response('Offline', { status: 503, statusText: 'Offline' });
         });

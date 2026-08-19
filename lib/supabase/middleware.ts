@@ -38,7 +38,15 @@ export async function updateSession(request: NextRequest) {
 
   // 1. Pengguna belum masuk (unauthenticated)
   if (!user) {
-    if (pathname !== '/masuk' && !pathname.startsWith('/auth/')) {
+    const isPublicPath =
+      pathname === '/masuk' ||
+      pathname === '/manifest.json' ||
+      pathname === '/sw.js' ||
+      pathname === '/favicon.ico' ||
+      pathname.startsWith('/auth/') ||
+      pathname.startsWith('/icons/');
+
+    if (!isPublicPath) {
       const url = request.nextUrl.clone();
       url.pathname = '/masuk';
       return NextResponse.redirect(url);
