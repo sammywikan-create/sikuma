@@ -82,7 +82,7 @@ export default function DashboardView({
     };
   }, []);
   // State Filter
-  const [dateShortcut, setDateShortcut] = useState<DateShortcut>('bulan_ini');
+  const [dateShortcut, setDateShortcut] = useState<DateShortcut>('hari_ini');
   const [selectedMarketing, setSelectedMarketing] = useState<string>('semua');
   const [selectedVisitType, setSelectedVisitType] = useState<string>('semua');
   const [selectedOutcome, setSelectedOutcome] = useState<string>('semua');

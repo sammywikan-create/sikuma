@@ -97,6 +97,11 @@ export default function KunjunganView({
   const todayCount = todayVisits.length;
   const progressPercent = Math.min(100, Math.round((todayCount / dailyTarget) * 100));
 
+  // Filter riwayat: default Hari Ini
+  const [dateFilter, setDateFilter] = useState<'hari_ini' | '7_hari'>('hari_ini');
+
+  const displayedVisits = dateFilter === 'hari_ini' ? todayVisits : visits;
+
   return (
     <main className="flex-1 flex flex-col p-4 bg-slate-50 min-h-screen">
       {/* 1. Header Profil */}
@@ -203,24 +208,45 @@ export default function KunjunganView({
       <section className="mt-6 flex-1">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-900">
-            Riwayat Kunjungan Pemasaran
+            Riwayat Kunjungan
           </h2>
-          <span className="text-xs text-slate-400">30 Hari Terakhir</span>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setDateFilter('hari_ini')}
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                dateFilter === 'hari_ini'
+                  ? 'bg-bkk-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              Hari Ini ({todayCount})
+            </button>
+            <button
+              onClick={() => setDateFilter('7_hari')}
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                dateFilter === '7_hari'
+                  ? 'bg-bkk-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              7 Hari ({visits.length})
+            </button>
+          </div>
         </div>
 
-        {visits.length === 0 ? (
+        {displayedVisits.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
             <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto mb-2">
               📝
             </div>
-            <p className="text-sm font-semibold text-slate-700">Belum Ada Kunjungan</p>
+            <p className="text-sm font-semibold text-slate-700">Belum Ada Kunjungan {dateFilter === 'hari_ini' ? 'Hari Ini' : '7 Hari Terakhir'}</p>
             <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
               Ketuk tombol &quot;Catat Kunjungan Baru&quot; di atas untuk memulai dokumentasi.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {visits.map((visit) => {
+            {displayedVisits.map((visit) => {
               const isVerified = visit.verification_status === 'verified';
               const isRejected = visit.verification_status === 'rejected';
 

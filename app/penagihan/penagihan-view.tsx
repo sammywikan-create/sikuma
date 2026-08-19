@@ -95,6 +95,10 @@ export default function PenagihanView({
   const todayCount = todayVisits.length;
   const progressPercent = Math.min(Math.round((todayCount / dailyTarget) * 100), 100);
 
+  // Filter riwayat: default Hari Ini
+  const [dateFilter, setDateFilter] = useState<'hari_ini' | '7_hari'>('hari_ini');
+  const displayedVisits = dateFilter === 'hari_ini' ? todayVisits : visits;
+
   return (
     <main className="flex-1 flex flex-col p-4 bg-slate-50 min-h-screen pb-16">
       {/* 1. Header Profil AO */}
@@ -204,18 +208,39 @@ export default function PenagihanView({
       <div className="mt-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-900">
-            Riwayat Penagihan ({visits.length})
+            Riwayat Penagihan
           </h2>
-          <span className="text-[11px] text-slate-400">30 Hari Terakhir</span>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setDateFilter('hari_ini')}
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                dateFilter === 'hari_ini'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              Hari Ini ({todayCount})
+            </button>
+            <button
+              onClick={() => setDateFilter('7_hari')}
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                dateFilter === '7_hari'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              7 Hari ({visits.length})
+            </button>
+          </div>
         </div>
 
-        {visits.length === 0 ? (
+        {displayedVisits.length === 0 ? (
           <div className="p-8 text-center bg-white border border-slate-200/80 rounded-2xl shadow-sm">
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl mx-auto mb-3">
               💳
             </div>
             <h3 className="text-sm font-bold text-slate-800">
-              Belum Ada Catatan Penagihan
+              Belum Ada Penagihan {dateFilter === 'hari_ini' ? 'Hari Ini' : '7 Hari Terakhir'}
             </h3>
             <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
               Ketuk tombol &quot;Catat Penagihan Debitur&quot; di atas untuk merekam penagihan lapangan pertama Anda.
@@ -223,7 +248,7 @@ export default function PenagihanView({
           </div>
         ) : (
           <div className="space-y-3">
-            {visits.map((visit) => (
+            {displayedVisits.map((visit) => (
               <div
                 key={visit.id}
                 className="p-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-sm space-y-2.5 transition hover:border-slate-300"

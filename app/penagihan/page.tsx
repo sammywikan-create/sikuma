@@ -37,10 +37,10 @@ export default async function PenagihanPage() {
 
   const dailyTarget = Number(targetSetting?.value) || 5;
 
-  // 2. Ambil riwayat penagihan 30 hari terakhir untuk petugas ini
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  thirtyDaysAgo.setHours(0, 0, 0, 0);
+  // 2. Ambil riwayat penagihan 7 hari terakhir untuk petugas ini
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
 
   const { data: visitsRaw } = await supabase
     .from('visits')
@@ -50,7 +50,7 @@ export default async function PenagihanPage() {
     `)
     .eq('marketing_id', user.id)
     .eq('visit_type', 'penagihan')
-    .gte('captured_at', thirtyDaysAgo.toISOString())
+    .gte('captured_at', sevenDaysAgo.toISOString())
     .order('captured_at', { ascending: false });
 
   const visits = (visitsRaw as unknown as VisitWithPhotos[]) || [];
