@@ -19,7 +19,7 @@ interface DashboardViewProps {
   userRole: 'kacab' | 'admin';
 }
 
-type DateShortcut = 'hari_ini' | '7_hari' | 'bulan_ini' | 'semua';
+type DateShortcut = 'hari_ini' | '7_hari' | 'bulan_ini' | 'semua' | 'tanggal';
 type SortField =
   | 'marketing_name'
   | 'total_visits'
@@ -83,6 +83,11 @@ export default function DashboardView({
   }, []);
   // State Filter
   const [dateShortcut, setDateShortcut] = useState<DateShortcut>('hari_ini');
+  const [customDate, setCustomDate] = useState(() => {
+    const d = new Date();
+    const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+    return wib.toISOString().substring(0, 10);
+  });
   const [selectedMarketing, setSelectedMarketing] = useState<string>('semua');
   const [selectedVisitType, setSelectedVisitType] = useState<string>('semua');
   const [selectedOutcome, setSelectedOutcome] = useState<string>('semua');
@@ -117,6 +122,9 @@ export default function DashboardView({
     } else if (dateShortcut === 'bulan_ini') {
       startFilter = new Date(now.getFullYear(), now.getMonth(), 1);
       endFilter = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (dateShortcut === 'tanggal' && customDate) {
+      startFilter = new Date(customDate + 'T00:00:00+07:00');
+      endFilter = new Date(customDate + 'T23:59:59+07:00');
     }
 
     return visitsList.filter((v) => {
@@ -450,9 +458,10 @@ export default function DashboardView({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {[
             { id: 'hari_ini', label: 'Hari Ini' },
-            { id: '7_hari', label: '7 Hari Terakhir' },
+            { id: '7_hari', label: '7 Hari' },
             { id: 'bulan_ini', label: 'Bulan Ini' },
-            { id: 'semua', label: 'Semua Waktu' },
+            { id: 'semua', label: 'Semua' },
+            { id: 'tanggal', label: '📅 Tanggal' },
           ].map((sc) => (
             <button
               key={sc.id}
@@ -467,6 +476,14 @@ export default function DashboardView({
               {sc.label}
             </button>
           ))}
+          {dateShortcut === 'tanggal' && (
+            <input
+              type="date"
+              value={customDate}
+              onChange={(e) => setCustomDate(e.target.value)}
+              className="text-xs font-semibold px-2.5 py-1.5 border border-bkk-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-bkk-400"
+            />
+          )}
         </div>
 
         {/* Filter Dropdowns Grid */}

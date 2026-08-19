@@ -97,10 +97,28 @@ export default function KunjunganView({
   const todayCount = todayVisits.length;
   const progressPercent = Math.min(100, Math.round((todayCount / dailyTarget) * 100));
 
-  // Filter riwayat: default Hari Ini
-  const [dateFilter, setDateFilter] = useState<'hari_ini' | '7_hari'>('hari_ini');
+  // Filter riwayat: default Hari Ini, bisa pilih tanggal spesifik
+  const [dateFilter, setDateFilter] = useState<'hari_ini' | '7_hari' | 'tanggal'>('hari_ini');
+  const [selectedDate, setSelectedDate] = useState(() => {
+    // Default: hari ini WIB format YYYY-MM-DD
+    const d = new Date();
+    const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+    return wib.toISOString().substring(0, 10);
+  });
 
-  const displayedVisits = dateFilter === 'hari_ini' ? todayVisits : visits;
+  const displayedVisits = (() => {
+    if (dateFilter === 'hari_ini') return todayVisits;
+    if (dateFilter === '7_hari') return visits;
+    // Filter per tanggal spesifik
+    return visits.filter((v) => {
+      const vDateWIB = new Date(new Date(v.captured_at).getTime() + 7 * 60 * 60 * 1000)
+        .toISOString()
+        .substring(0, 10);
+      return vDateWIB === selectedDate;
+    });
+  })();
+
+  const filterLabel = dateFilter === 'hari_ini' ? 'Hari Ini' : dateFilter === '7_hari' ? '7 Hari Terakhir' : selectedDate;
 
   return (
     <main className="flex-1 flex flex-col p-4 bg-slate-50 min-h-screen">
@@ -108,18 +126,20 @@ export default function KunjunganView({
       <header className="flex items-center justify-between pb-3.5 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-bkk-600 bg-bkk-50 px-2.5 py-0.5 rounded-full border border-bkk-200">
-              {profile.marketing_code || 'MKT'}
+            <span className="text-xs font-bold uppercase tracking-wider text-bkk-700 bg-bkk-50 px-2 py-0.5 rounded-full border border-bkk-200">
+              Marketing
+            </span>
+            <span className="font-mono text-xs font-bold text-slate-700">
+              [{profile.marketing_code || 'MKT'}]
             </span>
             <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live Realtime
+              Live
             </span>
           </div>
-          <h1 className="text-lg font-bold text-slate-900 mt-1">
+          <h1 className="text-lg font-bold text-slate-900 mt-0.5">
             {profile.full_name}
           </h1>
-          <p className="text-[11px] text-slate-500">{userEmail}</p>
         </div>
 
         <form action="/auth/keluar" method="POST">
@@ -206,31 +226,54 @@ export default function KunjunganView({
 
       {/* 5. Daftar Riwayat Kunjungan */}
       <section className="mt-6 flex-1">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-bold text-slate-900">
             Riwayat Kunjungan
           </h2>
-          <div className="flex gap-1.5">
+          <span className="text-[11px] text-slate-400 font-medium">{displayedVisits.length} data</span>
+        </div>
+
+        {/* Filter Tanggal */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          <button
+            onClick={() => setDateFilter('hari_ini')}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+              dateFilter === 'hari_ini'
+                ? 'bg-bkk-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+          >
+            Hari Ini
+          </button>
+          <button
+            onClick={() => setDateFilter('7_hari')}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
+              dateFilter === '7_hari'
+                ? 'bg-bkk-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+          >
+            7 Hari
+          </button>
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => setDateFilter('hari_ini')}
+              onClick={() => setDateFilter('tanggal')}
               className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                dateFilter === 'hari_ini'
+                dateFilter === 'tanggal'
                   ? 'bg-bkk-600 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
               }`}
             >
-              Hari Ini ({todayCount})
+              📅 Tanggal
             </button>
-            <button
-              onClick={() => setDateFilter('7_hari')}
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                dateFilter === '7_hari'
-                  ? 'bg-bkk-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-            >
-              7 Hari ({visits.length})
-            </button>
+            {dateFilter === 'tanggal' && (
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-[11px] font-semibold px-2 py-1 border border-bkk-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-bkk-400"
+              />
+            )}
           </div>
         </div>
 
@@ -239,7 +282,7 @@ export default function KunjunganView({
             <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto mb-2">
               📝
             </div>
-            <p className="text-sm font-semibold text-slate-700">Belum Ada Kunjungan {dateFilter === 'hari_ini' ? 'Hari Ini' : '7 Hari Terakhir'}</p>
+            <p className="text-sm font-semibold text-slate-700">Belum Ada Kunjungan {filterLabel}</p>
             <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
               Ketuk tombol &quot;Catat Kunjungan Baru&quot; di atas untuk memulai dokumentasi.
             </p>
